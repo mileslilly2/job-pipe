@@ -1,0 +1,113 @@
+role_name: Help Desk / IT Support
+description: Entry-level IT support, service desk, help desk, Level 1 technician roles.
+positive_keywords:
+  - help desk
+  - service desk
+  - level 1
+  - tier 1
+  - IT support
+  - troubleshooting
+  - ticketing
+  - remote support
+  - hardware
+  - software
+  - Windows
+  - Mac
+  - Office 365
+  - documentation
+strong_keywords:
+  - Help Desk Analyst
+  - Service Desk Analyst
+  - Level 1 IT Technician
+  - IT Support Specialist
+  - Technical Support Specialist
+negative_keywords:
+  - commission only
+  - door to door
+  - outside sales
+  - senior
+  - manager
+  - 5+ years
+  - active clearance required
+  - must purchase equipment
+  - training fee
+seniority_exclusion_keywords:
+  - senior
+  - lead
+  - principal
+  - manager
+  - director
+  - 5+ years
+  - 7+ years
+required_skill_groups:
+  troubleshooting:
+    - troubleshooting
+    - diagnose
+    - resolve issues
+    - technical assistance
+  communication:
+    - customer service
+    - end users
+    - phone
+    - chat
+    - email
+  documentation:
+    - documentation
+    - tickets
+    - knowledge base
+    - ticketing system
+nice_to_have_skill_groups:
+  identity:
+    - Active Directory
+    - account access
+    - password reset
+  productivity:
+    - Office 365
+    - Microsoft 365
+    - Outlook
+  remote_support:
+    - remote desktop
+    - remote support
+    - VPN
+resume_angles:
+  - troubleshooting
+  - documentation
+  - automation
+  - customer communication
+  - debugging
+  - process improvement
+  - Linux familiarity
+common_tools:
+  - Zendesk
+  - Jira
+  - ServiceNow
+  - Freshdesk
+  - Office 365
+  - Active Directory
+  - Remote Desktop
+red_flags:
+  - no company website
+  - Telegram interview
+  - WhatsApp interview
+  - asks candidate to buy equipment
+  - asks candidate to deposit a check
+  - vague company
+  - high pay plus no experience
+  - no product or service described
+  - commission-only support role
+search_terms:
+  - Remote Help Desk Analyst I
+  - Remote Service Desk Analyst I
+  - Remote Level 1 IT Technician
+  - Remote Technical Support Specialist I
+  - Remote IT Support Specialist Entry Level
+bullet_templates:
+  - "Troubleshot technical workflow issues across {project_or_context}, isolating root causes and documenting repeatable fixes."
+  - "Created validation and recovery steps to prevent failed automation runs from silently producing broken outputs."
+  - "Used Python, Linux, and command-line tools to debug file, API, media, and deployment issues."
+  - "Documented technical processes clearly so repeated issues could be resolved faster."
+answer_angles:
+  why_interested:
+    - "I am interested in this role because it combines technical troubleshooting, clear communication, and structured problem solving."
+  weakness_bridge:
+    - "While I do not have formal corporate help desk experience, I have built and debugged real software workflows and can translate technical issues into clear steps."

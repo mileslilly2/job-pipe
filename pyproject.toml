@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobpipe"
+version = "0.1.0"
+description = "Local-first CLI for repetitive job application preparation."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "jinja2>=3.1",
+  "pydantic>=2.7",
+  "PyYAML>=6.0",
+  "rich>=13.7",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+]
+
+[project.scripts]
+jobpipe = "jobpipe.cli:app"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["jobpipe*"]
+
+[tool.setuptools.package-data]
+jobpipe = [
+  "data/profiles/*.yaml",
+  "role_packs/*.yaml",
+  "templates/*.j2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

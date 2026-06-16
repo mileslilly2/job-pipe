@@ -1,0 +1,18 @@
+Title: Junior Python Developer
+Company: Harbor Tools LLC
+Location: Hybrid - Boston, MA
+Employment Type: Full-time
+Salary: $62,000 annually
+
+Harbor Tools builds internal workflow software.
+
+Responsibilities
+- Build and maintain Python scripts and web integrations.
+- Debug defects, write tests, and document implementation details.
+- Collaborate with QA and support on issue reproduction.
+
+Requirements
+- Python
+- debugging
+- tests
+- Git

@@ -1,0 +1,135 @@
+profile:
+  name: "Your Name"
+  email: "you@example.com"
+  location: "Your City, ST"
+  summary: "Project-focused technical problem solver with experience building Python automation, web apps, CLI tools, tests, and debugging workflows. Strong at documentation, troubleshooting, and translating technical issues into clear steps."
+  target_roles:
+    - remote
+    - entry level technical support
+    - help desk
+    - junior developer
+    - customer support
+
+skills:
+  technical:
+    - troubleshooting
+    - debugging
+    - API testing
+    - QA mindset
+  support:
+    - ticket triage
+    - issue reproduction
+    - documentation
+    - customer communication
+  communication:
+    - written communication
+    - status updates
+    - user-facing explanations
+  tools:
+    - Git
+    - Playwright
+    - SQLite
+    - Jinja2
+  operating_systems:
+    - Linux
+    - macOS
+    - Windows familiarity
+  programming:
+    - Python
+    - JavaScript
+    - TypeScript
+  web:
+    - HTML
+    - CSS
+    - Next.js
+  automation:
+    - CLI tools
+    - workflow automation
+    - validation scripts
+
+projects:
+  - name: "Python automation pipeline"
+    type: "project"
+    technologies: ["Python", "SQLite", "Jinja2", "CLI"]
+    description: "Built a local automation pipeline that ingested structured inputs, validated outputs, and generated repeatable artifacts."
+    bullets:
+      - "Built a Python automation pipeline that parsed inputs, validated outputs, and generated repeatable deliverables."
+      - "Added recovery checks and logging so broken runs could be diagnosed quickly instead of failing silently."
+    support_angles: ["troubleshooting", "documentation", "process improvement"]
+    technical_angles: ["automation", "debugging", "data validation"]
+    proof_points: ["Python", "validation", "repeatable workflows"]
+  - name: "Next.js app"
+    type: "project"
+    technologies: ["Next.js", "TypeScript", "CSS"]
+    description: "Created a web application with structured UI flows and reusable components."
+    bullets:
+      - "Built a Next.js application with structured user flows and reusable components for a smoother user experience."
+      - "Debugged client-side issues by isolating broken states and testing fixes incrementally."
+    support_angles: ["communication", "issue reproduction"]
+    technical_angles: ["web development", "front-end debugging"]
+    proof_points: ["Next.js", "testing", "user flows"]
+  - name: "Media generation workflow"
+    type: "project"
+    technologies: ["Python", "FFmpeg", "file processing"]
+    description: "Automated a multi-step media generation workflow with validation and error handling."
+    bullets:
+      - "Automated a media generation workflow and added validation steps to catch bad inputs before they spread downstream."
+      - "Documented repeatable troubleshooting steps for file, dependency, and output issues."
+    support_angles: ["documentation", "troubleshooting"]
+    technical_angles: ["automation", "Linux troubleshooting"]
+    proof_points: ["CLI tools", "validation scripts", "debugging"]
+  - name: "Debugging scripts"
+    type: "project"
+    technologies: ["Python", "shell", "logs"]
+    description: "Created scripts to inspect outputs, compare states, and speed up debugging."
+    bullets:
+      - "Wrote debugging scripts to compare outputs, surface failures quickly, and reduce manual checking."
+      - "Used logs and command-line tools to isolate root causes in repeatable ways."
+    support_angles: ["root cause analysis", "clear steps"]
+    technical_angles: ["debugging", "CLI tooling"]
+    proof_points: ["command-line tools", "logs", "root cause analysis"]
+  - name: "Playwright tests"
+    type: "project"
+    technologies: ["Playwright", "TypeScript", "test automation"]
+    description: "Built browser tests to validate key workflows and reproduce bugs reliably."
+    bullets:
+      - "Built Playwright tests to reproduce user-facing issues and verify fixes across key workflows."
+      - "Turned repeated manual checks into automated coverage with clearer failure output."
+    support_angles: ["issue reproduction", "communication"]
+    technical_angles: ["QA", "testing", "workflow validation"]
+    proof_points: ["Playwright", "bug reproduction", "automation"]
+  - name: "Linux troubleshooting"
+    type: "project"
+    technologies: ["Linux", "shell", "Python"]
+    description: "Resolved local environment, dependency, and file-permission issues while maintaining development workflows."
+    bullets:
+      - "Resolved Linux environment, dependency, and file-permission issues using logs, shell tools, and targeted fixes."
+      - "Documented setup and troubleshooting steps so recurring issues could be resolved faster."
+    support_angles: ["technical troubleshooting", "documentation"]
+    technical_angles: ["Linux", "command line", "debugging"]
+    proof_points: ["Linux", "permissions", "dependencies"]
+
+experience: []
+
+education:
+  - school: "Sample Community College"
+    degree: "Coursework in technology and general studies"
+    dates: "YYYY - YYYY"
+
+constraints:
+  avoid_claiming:
+    - Active Directory admin experience
+    - ServiceNow experience
+    - corporate help desk experience
+    - security clearance
+  preferred_roles:
+    - remote
+    - entry level
+    - technical support
+    - help desk
+    - junior developer
+  dealbreakers:
+    - commission only
+    - unpaid
+    - requires buying equipment
+    - door to door sales

@@ -1,0 +1,57 @@
+role_name: General Customer Support
+description: Entry-level customer support roles with structured workflows and light technical overlap.
+positive_keywords:
+  - customer support
+  - support specialist
+  - chat support
+  - email support
+  - troubleshooting
+  - documentation
+strong_keywords:
+  - Customer Support Specialist
+  - Support Representative
+negative_keywords:
+  - commission only
+  - outbound sales
+  - door to door
+seniority_exclusion_keywords:
+  - manager
+  - lead
+  - director
+required_skill_groups:
+  communication:
+    - customer
+    - email
+    - chat
+    - communication
+  workflow:
+    - documentation
+    - tickets
+    - process
+nice_to_have_skill_groups:
+  tools:
+    - CRM
+    - knowledge base
+    - help center
+resume_angles:
+  - customer communication
+  - documentation
+  - process improvement
+common_tools:
+  - Zendesk
+  - Freshdesk
+  - Intercom
+red_flags:
+  - Telegram interview
+  - WhatsApp interview
+  - commission only
+  - asks candidate to deposit a check
+search_terms:
+  - Remote Customer Support Specialist
+bullet_templates:
+  - "Handled structured workflows carefully, documented repeatable steps, and kept communication clear."
+answer_angles:
+  why_interested:
+    - "I am interested in this role because it requires clear communication, consistency, and practical problem solving."
+  weakness_bridge:
+    - "My experience is project-focused, but the underlying work of following processes, solving problems, and communicating clearly is directly relevant."

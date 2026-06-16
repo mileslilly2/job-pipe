@@ -1,0 +1,68 @@
+role_name: Junior Developer / QA-adjacent
+description: Junior Python, web, QA, and automation roles.
+positive_keywords:
+  - junior developer
+  - junior python
+  - QA
+  - test automation
+  - playwright
+  - debugging
+  - web app
+  - python
+strong_keywords:
+  - Junior Python Developer
+  - QA Analyst
+  - Junior Web Developer
+negative_keywords:
+  - senior
+  - architect
+  - staff
+  - 5+ years
+seniority_exclusion_keywords:
+  - senior
+  - lead
+  - staff
+  - architect
+required_skill_groups:
+  coding:
+    - python
+    - javascript
+    - debugging
+  testing:
+    - tests
+    - qa
+    - validate
+  communication:
+    - documentation
+    - collaboration
+nice_to_have_skill_groups:
+  web:
+    - next.js
+    - react
+    - html
+  tooling:
+    - git
+    - cli
+    - linux
+resume_angles:
+  - debugging
+  - automation
+  - process improvement
+common_tools:
+  - Git
+  - Playwright
+  - Pytest
+red_flags:
+  - training fee
+  - must purchase equipment
+  - vague company
+search_terms:
+  - Remote Junior Python Developer
+  - Remote QA Analyst
+bullet_templates:
+  - "Built and debugged application workflows, then automated repeatable checks to reduce regressions."
+answer_angles:
+  why_interested:
+    - "I am interested in this role because it combines debugging, automation, and practical software problem solving."
+  weakness_bridge:
+    - "I do not overstate my experience level, but I do have hands-on project work building, testing, and debugging real software workflows."

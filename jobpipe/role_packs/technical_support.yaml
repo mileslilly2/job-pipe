@@ -1,0 +1,75 @@
+role_name: Technical Customer Support / SaaS Support
+description: Entry-level SaaS support and technical customer support roles.
+positive_keywords:
+  - technical support
+  - product support
+  - SaaS
+  - troubleshooting
+  - tickets
+  - customer issues
+  - bug reproduction
+  - escalation
+  - API
+  - documentation
+strong_keywords:
+  - Technical Support Engineer
+  - Technical Customer Support
+  - Product Support Specialist
+negative_keywords:
+  - quota
+  - sales
+  - commission only
+  - 5+ years
+seniority_exclusion_keywords:
+  - senior
+  - lead
+  - manager
+  - 5+ years
+required_skill_groups:
+  troubleshooting:
+    - troubleshooting
+    - investigate
+    - root cause
+  communication:
+    - customer
+    - email
+    - chat
+    - explain
+  product_workflows:
+    - reproduce
+    - documentation
+    - tickets
+nice_to_have_skill_groups:
+  web:
+    - HTML
+    - CSS
+    - JavaScript
+  integrations:
+    - API
+    - webhook
+    - logs
+resume_angles:
+  - troubleshooting
+  - debugging
+  - customer communication
+  - documentation
+common_tools:
+  - Zendesk
+  - Jira
+  - Intercom
+  - Postman
+red_flags:
+  - Telegram interview
+  - WhatsApp interview
+  - asks candidate to deposit a check
+  - vague company
+search_terms:
+  - Remote Technical Support Specialist
+  - Remote Product Support Specialist
+bullet_templates:
+  - "Reproduced and isolated workflow failures, then documented fixes so similar issues could be resolved faster."
+answer_angles:
+  why_interested:
+    - "I am interested in this role because it combines troubleshooting, product understanding, and clear customer communication."
+  weakness_bridge:
+    - "While my background is project-based, I have already done the core work of reproducing issues, isolating causes, and documenting fixes."

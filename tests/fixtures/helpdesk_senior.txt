@@ -1,0 +1,17 @@
+Title: Senior Help Desk Analyst
+Company: Meridian Services Inc
+Location: Remote - United States
+Employment Type: Full-time
+Salary: $78,000 annually
+
+Meridian Services Inc provides IT support services to enterprise clients.
+
+Responsibilities
+- Lead escalations across the service desk team.
+- Manage complex troubleshooting and mentor junior technicians.
+- Maintain documentation and service metrics.
+
+Requirements
+- 5+ years of help desk experience
+- ServiceNow
+- Active Directory

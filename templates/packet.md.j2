@@ -1,0 +1,65 @@
+# Application Packet: {{ job.title }}
+
+Company: {{ job.company }}
+Location: {{ job.location }}
+Remote: {{ job.remote_type }}
+Salary: {{ job.salary_text }}
+Source: {{ job.source_url }}
+
+## Verdict
+
+Fit score: {{ analysis.fit_score }}/100
+Risk score: {{ analysis.risk_score }}/100
+Quality score: {{ analysis.quality_score }}/100
+
+Recommendation: {{ packet.recommendation }}
+
+{{ packet.rationale }}
+
+## Why this fits
+
+{% for keyword in analysis.matched_keywords %}
+- {{ keyword }}
+{% endfor %}
+
+## Concerns / red flags
+
+{% for flag in packet.concerns %}
+- {{ flag }}
+{% endfor %}
+
+## Missing keywords
+
+{% for keyword in analysis.missing_keywords %}
+- {{ keyword }}
+{% endfor %}
+
+## Suggested resume angle
+
+{{ tailor.resume_angle }}
+
+## Tailored bullets
+
+{% for bullet in tailor.tailored_bullets %}
+- {{ bullet.text }}
+  Provenance: {{ bullet.provenance }} | {{ bullet.support_note }}
+{% endfor %}
+
+## Short application answers
+
+### Why interested
+
+{{ tailor.short_answers["why_interested"] }}
+
+### Experience bridge
+
+{{ tailor.short_answers["weakness_bridge"] }}
+
+## Human review checklist
+
+- Does the resume tell the truth?
+- Is this a real company?
+- Is the pay structure clear?
+- Is this actually support or IT, not sales?
+- Did the application ask for money, equipment purchases, or suspicious personal info?
+- Did I review before submitting?

@@ -1,0 +1,24 @@
+Title: Help Desk Analyst I
+Company: Northstar Health Systems
+Location: Remote - United States
+Employment Type: Full-time
+Salary: $24 - $28 / hour
+
+About the role
+Northstar Health Systems provides software and support services to regional clinics across the United States.
+
+Responsibilities
+- Provide level 1 help desk support for end users across Windows, Mac, Outlook, and browser-based tools.
+- Troubleshoot hardware, software, password reset, VPN, and remote access issues.
+- Document tickets clearly in the ticketing system and maintain knowledge base articles.
+- Communicate with users by phone, email, and chat.
+
+Requirements
+- Strong troubleshooting and documentation habits.
+- Comfort learning new tools quickly.
+- Entry-level candidates are welcome.
+- Experience with Jira, Freshdesk, Office 365, or similar systems is helpful.
+
+Benefits
+- Medical, dental, PTO
+- Clear training plan and team support

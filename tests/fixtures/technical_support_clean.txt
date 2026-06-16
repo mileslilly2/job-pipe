@@ -1,0 +1,17 @@
+Title: Technical Customer Support Specialist
+Company: Acorn Cloud Software
+Location: Remote - US
+Employment Type: Full-time
+Salary: $55,000 annually
+
+Acorn Cloud Software builds workflow software for operations teams.
+
+Responsibilities
+- Troubleshoot customer issues across the web app and API.
+- Reproduce bugs, document findings, and escalate engineering issues with clear notes.
+- Support customers over email and chat.
+- Maintain help center documentation.
+
+Requirements
+- Strong debugging and communication skills.
+- Familiarity with APIs, logs, HTML, or JavaScript is helpful.

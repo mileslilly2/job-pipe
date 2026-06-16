@@ -1,0 +1,29 @@
+# {{ candidate.profile.name }}
+
+{{ candidate.profile.location }} | {{ candidate.profile.email }}
+
+## Summary
+
+{{ tailor.resume_summary }}
+
+## Targeted Role
+
+{{ job.title or analysis.role_type }} at {{ job.company or "Unknown company" }}
+
+## Selected Skills
+
+{% for skill in tailor.selected_skills %}
+- {{ skill }}
+{% endfor %}
+
+## Relevant Project Highlights
+
+{% for bullet in tailor.tailored_bullets %}
+- {{ bullet.text }}
+{% endfor %}
+
+## Education
+
+{% for item in candidate.education %}
+- {{ item.school }} | {{ item.degree }} | {{ item.dates }}
+{% endfor %}
