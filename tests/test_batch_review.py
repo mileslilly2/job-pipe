@@ -33,7 +33,7 @@ def test_batch_review_processes_save_package_apply_and_skip_paths(initialized_wo
     opened_urls: list[str] = []
     monkeypatch.setattr("jobpipe.cli.open_url", lambda url: opened_urls.append(url) or True)
 
-    result = runner.invoke(app, ["batch-review"], input="s\np\na\ny\nk\n")
+    result = runner.invoke(app, ["batch-review"], input="s\n\n\np\n\n\na\n\n\ny\nk\n\n\n")
     assert result.exit_code == 0, result.stdout
 
     assert opened_urls == ["https://example.com/apply"]

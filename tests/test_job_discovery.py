@@ -210,7 +210,7 @@ def test_review_session_can_show_details_and_save(initialized_workspace, runner,
     opened = []
     monkeypatch.setattr("jobpipe.cli.open_url", lambda url: opened.append(url) or True)
 
-    result = runner.invoke(app, ["review"], input="d\ny\nq\n")
+    result = runner.invoke(app, ["review"], input="d\ny\n\n\nq\n")
     assert result.exit_code == 0, result.stdout
     assert "Fit breakdown" in result.stdout
     assert get_job(first_id)["status"] == "saved"

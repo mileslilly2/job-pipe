@@ -17,7 +17,9 @@ from .db import (
     get_job,
     get_job_by_provider_external_id,
     init_database,
+    insert_feedback,
     insert_job,
+    list_feedback_with_analysis,
     list_jobs as db_list_jobs,
     list_review_jobs,
     set_review_status,
@@ -28,7 +30,8 @@ from .db import (
 )
 from .export import export_tracker_csv
 from .ingest import filter_discovered_jobs, ingest_text_file, ingest_url, load_job_sources, resolve_job_sources
-from .models import CandidateProfile, JobAnalysis, JobSource, ParsedJob, RolePack
+from .learn import load_learned_weights, sync_weights
+from .models import CandidateProfile, FeedbackEvent, JobAnalysis, JobSource, ParsedJob, RolePack
 from .packet import build_packet_context
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
@@ -173,7 +176,8 @@ def _render_template(template_name: str, context: dict) -> str:
 
 
 def _score_notes(job_row) -> tuple[int, list[str]]:
-    score, notes = score_job_fit_v1(dict(job_row))
+    learned_weights = load_learned_weights()
+    score, notes = score_job_fit_v1(dict(job_row), learned_weights=learned_weights)
     return score, notes
 
 
@@ -230,7 +234,7 @@ def _ensure_application_package(job_id: int, job: dict) -> tuple[Path, Path, Pat
     return paths.resume_tailored_md, paths.cover_note_md, paths.apply_md
 
 
-def _apply_flow_session(job_id: int) -> None:
+def _apply_flow_session(job_id: int, reason: str | None = None, note: str | None = None) -> None:
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
@@ -253,6 +257,8 @@ def _apply_flow_session(job_id: int) -> None:
     if answer == "y":
         update_status(job_id, "applied")
         set_review_status(job_id, "applied")
+        insert_feedback(job_id, "applied", reason, note)
+        sync_weights()
         console.print(f"Marked job {job_id} as applied.")
     else:
         console.print("Left job unchanged.")
@@ -264,33 +270,47 @@ def _batch_review_job(job_row) -> None:
         _print_queue_job(job_row)
         choice = input("[s] save only  [p] save + package  [a] save + package + apply-flow  [k] skip  [d] details  [o] open URL  [q] quit: ").strip().lower()
         job_id = int(job["id"])
-        if choice == "s":
-            set_review_status(job_id, "saved")
-            console.print(f"Saved job {job_id}.")
-            return
-        if choice == "p":
-            set_review_status(job_id, "saved")
-            try:
-                paths = build_application_package(job_id)
-            except ValueError as exc:
-                raise typer.BadParameter(str(exc)) from exc
-            console.print(f"Saved job {job_id}.")
-            console.print(f"Generated application package: {paths.directory}")
-            return
-        if choice == "a":
-            set_review_status(job_id, "saved")
-            try:
-                paths = build_application_package(job_id)
-            except ValueError as exc:
-                raise typer.BadParameter(str(exc)) from exc
-            console.print(f"Saved job {job_id}.")
-            console.print(f"Generated application package: {paths.directory}")
-            _apply_flow_session(job_id)
-            return
-        if choice == "k":
-            set_review_status(job_id, "skipped")
-            console.print(f"Skipped job {job_id}.")
-            return
+
+        if choice in ("s", "p", "a", "k"):
+            reason = input("Reason code (optional): ").strip() or None
+            note = input("Note (optional): ").strip() or None
+
+            if choice == "s":
+                set_review_status(job_id, "saved")
+                insert_feedback(job_id, "saved", reason, note)
+                sync_weights()
+                console.print(f"Saved job {job_id}.")
+                return
+            if choice == "p":
+                set_review_status(job_id, "saved")
+                insert_feedback(job_id, "packaged", reason, note)
+                sync_weights()
+                try:
+                    paths = build_application_package(job_id)
+                except ValueError as exc:
+                    raise typer.BadParameter(str(exc)) from exc
+                console.print(f"Saved job {job_id}.")
+                console.print(f"Generated application package: {paths.directory}")
+                return
+            if choice == "a":
+                set_review_status(job_id, "saved")
+                insert_feedback(job_id, "packaged", reason, note)
+                sync_weights()
+                try:
+                    paths = build_application_package(job_id)
+                except ValueError as exc:
+                    raise typer.BadParameter(str(exc)) from exc
+                console.print(f"Saved job {job_id}.")
+                console.print(f"Generated application package: {paths.directory}")
+                _apply_flow_session(job_id, reason, note)
+                return
+            if choice == "k":
+                set_review_status(job_id, "skipped")
+                insert_feedback(job_id, "skipped", reason, note)
+                sync_weights()
+                console.print(f"Skipped job {job_id}.")
+                return
+
         if choice == "d":
             _print_job_details(get_job(job_id))
             continue
@@ -496,19 +516,21 @@ def packet(job_id: int) -> None:
 
 
 @app.command("package")
-def package(job_id: int) -> None:
+def package(job_id: int, reason: str | None = typer.Option(None), note: str | None = typer.Option(None)) -> None:
     _ensure_workspace()
     try:
         paths = build_application_package(job_id)
+        insert_feedback(job_id, "packaged", reason, note)
+        sync_weights()
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     console.print(f"Generated application package: {paths.directory}")
 
 
 @app.command("apply-flow")
-def apply_flow(job_id: int) -> None:
+def apply_flow(job_id: int, reason: str | None = typer.Option(None), note: str | None = typer.Option(None)) -> None:
     _ensure_workspace()
-    _apply_flow_session(job_id)
+    _apply_flow_session(job_id, reason, note)
 
 
 @app.command("review")
@@ -524,16 +546,26 @@ def review() -> None:
         row = rows[index]
         _print_queue_job(row)
         choice = input("[y] save  [s] skip  [d] details  [o] open URL  [q] quit: ").strip().lower()
-        if choice == "y":
-            set_review_status(int(row["id"]), "saved")
-            console.print(f"Saved job {row['id']}.")
-            index += 1
-            continue
-        if choice == "s":
-            set_review_status(int(row["id"]), "skipped")
-            console.print(f"Skipped job {row['id']}.")
-            index += 1
-            continue
+        if choice in ("y", "s"):
+            reason = input("Reason code (optional): ").strip() or None
+            note = input("Note (optional): ").strip() or None
+
+            if choice == "y":
+                job_id = int(row["id"])
+                set_review_status(job_id, "saved")
+                insert_feedback(job_id, "saved", reason, note)
+                sync_weights()
+                console.print(f"Saved job {job_id}.")
+                index += 1
+                continue
+            if choice == "s":
+                job_id = int(row["id"])
+                set_review_status(job_id, "skipped")
+                insert_feedback(job_id, "skipped", reason, note)
+                sync_weights()
+                console.print(f"Skipped job {job_id}.")
+                index += 1
+                continue
         if choice == "d":
             _print_job_details(get_job(int(row["id"])))
             continue
@@ -565,22 +597,26 @@ def batch_review() -> None:
 
 
 @app.command("save")
-def save(job_id: int) -> None:
+def save(job_id: int, reason: str | None = typer.Option(None), note: str | None = typer.Option(None)) -> None:
     _ensure_workspace()
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
     set_review_status(job_id, "saved")
+    insert_feedback(job_id, "saved", reason, note)
+    sync_weights()
     console.print(f"Saved job {job_id}.")
 
 
 @app.command("skip")
-def skip(job_id: int) -> None:
+def skip(job_id: int, reason: str | None = typer.Option(None), note: str | None = typer.Option(None)) -> None:
     _ensure_workspace()
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
     set_review_status(job_id, "skipped")
+    insert_feedback(job_id, "skipped", reason, note)
+    sync_weights()
     console.print(f"Skipped job {job_id}.")
 
 
@@ -624,10 +660,13 @@ def tailor(job_id: int) -> None:
 
 
 @app.command("status")
-def status(job_id: int, status_value: str, notes: str = "") -> None:
+def status(job_id: int, status_value: str, notes: str = "", reason: str | None = typer.Option(None)) -> None:
     if status_value not in ALLOWED_STATUSES:
         raise typer.BadParameter(f"Status must be one of: {', '.join(ALLOWED_STATUSES)}")
     update_status(job_id, status_value, notes)
+    if status_value in ("saved", "skipped", "applied"):
+        insert_feedback(job_id, status_value, reason, notes)
+        sync_weights()
     console.print(f"Updated job {job_id} to {status_value}.")
 
 
@@ -825,6 +864,71 @@ def sources_test(source_id: str | None = typer.Argument(None, help="Optional com
 
 
 app.add_typer(sources_app, name="sources")
+
+
+@app.command("feedback")
+def feedback_command(
+    job_id: int,
+    action: str = typer.Argument(..., help="Action: saved, skipped, packaged, applied"),
+    reason: str | None = typer.Option(None, "--reason"),
+    note: str | None = typer.Option(None, "--note"),
+) -> None:
+    _ensure_workspace()
+    row = get_job(job_id)
+    if not row:
+        raise typer.BadParameter(f"Job {job_id} not found.")
+    
+    insert_feedback(job_id, action, reason, note)
+    sync_weights()
+    console.print(f"Recorded feedback for job {job_id}.")
+
+
+@app.command("feedback-report")
+def feedback_report() -> None:
+    _ensure_workspace()
+    feedback_rows = list_feedback_with_analysis()
+    if not feedback_rows:
+        console.print("No feedback recorded yet.")
+        return
+
+    from collections import Counter
+    actions = Counter(row["action"] for row in feedback_rows)
+    roles = Counter(row["role_type"] for row in feedback_rows if row["role_type"])
+    reasons = Counter(row["reason_codes"] for row in feedback_rows if row["reason_codes"])
+
+    table = Table(title="Feedback Statistics")
+    table.add_column("Category")
+    table.add_column("Details")
+    
+    table.add_row("Total Events", str(len(feedback_rows)))
+    table.add_row("Actions", "\n".join(f"{k}: {v}" for k, v in actions.items()))
+    table.add_row("Role Types", "\n".join(f"{k}: {v}" for k, v in roles.items()))
+    table.add_row("Reason Codes", "\n".join(f"{k}: {v}" for k, v in reasons.items()))
+    
+    console.print(table)
+
+    weights = load_learned_weights()
+    
+    role_table = Table(title="Learned Role Weights")
+    role_table.add_column("Role Family")
+    role_table.add_column("Adjustment")
+    for role, adj in weights.get("role_families", {}).items():
+        role_table.add_row(role, f"{adj:+d}")
+    console.print(role_table)
+
+    kw_table = Table(title="Learned Keyword Weights")
+    kw_table.add_column("Keyword")
+    kw_table.add_column("Adjustment")
+    for kw, adj in weights.get("keywords", {}).items():
+        kw_table.add_row(kw, f"{adj:+d}")
+    console.print(kw_table)
+
+
+@app.command("sync-weights")
+def sync_weights_command() -> None:
+    _ensure_workspace()
+    sync_weights()
+    console.print("Synchronized learned weights from feedback history.")
 
 
 if __name__ == "__main__":

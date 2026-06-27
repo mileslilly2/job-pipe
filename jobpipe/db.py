@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS applications (
     updated_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    reason_codes TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
 """
 
 
@@ -401,7 +411,34 @@ def list_jobs() -> list[sqlite3.Row]:
     )
 
 
+def insert_feedback(job_id: int, action: str, reason_codes: str | None = None, note: str | None = None) -> None:
+    timestamp = now_iso()
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO feedback (job_id, action, reason_codes, note, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (job_id, action, reason_codes, note, timestamp),
+        )
+
+
+def list_feedback_with_analysis() -> list[sqlite3.Row]:
+    return fetch_all(
+        """
+        SELECT
+            f.id, f.job_id, f.action, f.reason_codes, f.note, f.created_at,
+            ja.role_type, ja.matched_keywords_json
+        FROM feedback f
+        LEFT JOIN job_analysis ja ON f.job_id = ja.job_id
+        ORDER BY f.created_at ASC
+        """
+    )
+
+
 def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
+    from .learn import load_learned_weights
+    learned_weights = load_learned_weights()
     rows = fetch_all(
         """
         SELECT
@@ -414,7 +451,7 @@ def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
     ranked = sorted(
         rows,
         key=lambda row: (
-            -score_job_fit_v1(dict(row))[0],
+            -score_job_fit_v1(dict(row), learned_weights=learned_weights)[0],
             str(row["discovered_at"] or ""),
             int(row["id"]),
         ),

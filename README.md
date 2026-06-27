@@ -109,8 +109,9 @@ jobpipe analyze 3
 jobpipe packet 3
 jobpipe tailor 3
 jobpipe shortlist --min-fit 60 --max-risk 50
-jobpipe status 3 applied
+jobpipe status 3 applied --reason interesting_company
 jobpipe due
+jobpipe feedback-report
 jobpipe export
 ```
 
@@ -129,9 +130,11 @@ jobpipe export
    - `d` details
    - `o` open URL
    - `q` quit
-5. Use `jobpipe show <job-id>` for a full local detail view.
-6. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
-7. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually if you want.
+6. After choosing `s`, `p`, `a`, or `k`, you will be prompted for an optional **reason code** (e.g. `too_senior`, `strong_python`) and an optional **note**. These help the deterministic learner adjust your fit scores.
+7. Use `jobpipe show <job-id>` for a full local detail view, including a breakdown of learned adjustments.
+8. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
+9. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually.
+10. Use `jobpipe feedback-report` to see how the tool is adjusting your scores.
 
 ## Commands
 
@@ -156,6 +159,9 @@ jobpipe export
 - `jobpipe due [--limit INT]`
 - `jobpipe open JOB_ID`
 - `jobpipe export`
+- `jobpipe feedback JOB_ID ACTION [--reason ...] [--note ...]`
+- `jobpipe feedback-report`
+- `jobpipe sync-weights`
 - `jobpipe sources list`
 - `jobpipe sources add --provider PROVIDER --company COMPANY [--company-slug SLUG] [--board-token TOKEN] [--account ACCOUNT]`
 - `jobpipe sources enable SOURCE_ID`
@@ -165,7 +171,9 @@ jobpipe export
 ## Notes
 
 - Ingest uses only local configuration plus the public Greenhouse/Lever APIs.
-- Fit scoring v1 is deterministic and explainable; no LLMs are used yet.
-- `score_job_fit_v1` is the canonical user-facing fit score. Review, batch-review, list, details, and analyze all render from that helper; SQLite `fit_score` is a cache only. The scorer is role-family-first, so remote/location bonuses cannot outrank a bad-fit family.
+- Fit scoring v1 is deterministic and explainable; no LLMs are used for core ranking.
+- `score_job_fit_v1` is the canonical user-facing fit score. Review, batch-review, list, details, and analyze all render from that helper; SQLite `fit_score` is a cache only.
+- The scorer is role-family-first, so remote/location bonuses cannot outrank a bad-fit family.
+- **Deterministic Learning**: Job-Pipe learns from your review decisions (save, skip, package, apply). If you repeatedly save jobs with a certain role family or keyword, its weight increases. If you skip them, its weight decreases. Adjustments are stored in `data/learned_weights.yaml` and are capped at +/- 20 to ensure hard filters are never overridden.
 - Tailoring is constrained by the candidate profile and never invents paid experience, tools, certifications, or years of experience.
 - `profile.md` is the editable local base resume/profile used for package generation.

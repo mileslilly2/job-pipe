@@ -152,3 +152,11 @@ class PacketContext(BaseModel):
     reason: str | None = None
     explanation: str
     concerns: list[str] = Field(default_factory=list)
+
+
+class FeedbackEvent(BaseModel):
+    job_id: int
+    action: str
+    reason_codes: list[str] = Field(default_factory=list)
+    note: str | None = None
+    created_at: str | None = None

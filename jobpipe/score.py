@@ -178,7 +178,7 @@ def score_quality(job: ParsedJob, role_type: str, seniority: str) -> tuple[int, 
     return max(0, min(score, 100)), notes
 
 
-def score_job_fit_v1(job: Any) -> tuple[int, list[str]]:
+def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None) -> tuple[int, list[str]]:
     text = " ".join(
         str(value or "")
         for value in [
@@ -237,6 +237,21 @@ def score_job_fit_v1(job: Any) -> tuple[int, list[str]]:
     if remote_flag and not _has_phrase(text, "remote"):
         score += 2
         notes.append("+2 remote flag from structured source")
+
+    # Learned adjustments
+    if learned_weights:
+        role_adjustments = learned_weights.get("role_families", {})
+        if family in role_adjustments:
+            adj = role_adjustments[family]
+            score += adj
+            notes.append(f"{adj:+d} learned adjustment: role family '{family}'")
+        
+        keyword_adjustments = learned_weights.get("keywords", {})
+        for kw in keyword_hits:
+            if kw in keyword_adjustments:
+                adj = keyword_adjustments[kw]
+                score += adj
+                notes.append(f"{adj:+d} learned adjustment: keyword '{kw}'")
 
     score = max(0, min(score, 100))
     notes.append(f"final score: {score}")
