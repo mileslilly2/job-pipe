@@ -17,6 +17,17 @@ ApplicationStatus = Literal[
     "archived",
 ]
 
+RecommendationType = Literal["apply", "maybe", "skip"]
+SeniorityLevel = Literal[
+    "entry_level",
+    "junior",
+    "mid",
+    "senior",
+    "manager",
+    "director",
+    "unknown",
+]
+
 
 class ProjectItem(BaseModel):
     name: str
@@ -80,15 +91,43 @@ class ParsedJob(BaseModel):
     raw_text: str = ""
 
 
+class JobSource(BaseModel):
+    provider: str
+    company: str = ""
+    company_slug: str = ""
+    board_token: str | None = None
+    account: str | None = None
+    target_role_families: list[str] = Field(default_factory=list)
+    include_keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class DiscoveredJob(BaseModel):
+    provider: str
+    external_id: str
+    company: str
+    title: str
+    location: str = ""
+    remote: bool = False
+    apply_url: str = ""
+    description: str = ""
+    posted_at: str | None = None
+    source_url: str | None = None
+
+
 class JobAnalysis(BaseModel):
     role_type: str
     seniority_level: str
     fit_score: int
     risk_score: int
     quality_score: int
+    recommendation: str = "maybe"
+    skip_reason: str | None = None
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     red_flags: list[str] = Field(default_factory=list)
+    eligibility_flags: list[str] = Field(default_factory=list)
     notes: str = ""
 
 
@@ -110,5 +149,6 @@ class TailorResult(BaseModel):
 
 class PacketContext(BaseModel):
     recommendation: str
-    rationale: str
+    reason: str | None = None
+    explanation: str
     concerns: list[str] = Field(default_factory=list)

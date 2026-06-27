@@ -19,7 +19,7 @@ def _packs() -> dict[str, RolePack]:
 def test_tailoring_avoids_forbidden_claims() -> None:
     packs = _packs()
     job = parse_job_text(Path("tests/fixtures/helpdesk_clean.txt").read_text(encoding="utf-8"))
-    role_type, _seniority, _matched, _missing = classify_job(job, packs)
+    role_type, _matched, _missing = classify_job(job, packs)
     tailored = tailor_job(job, role_type, packs[role_type], _candidate())
     text = "\n".join([bullet.text for bullet in tailored.tailored_bullets])
     forbidden = [

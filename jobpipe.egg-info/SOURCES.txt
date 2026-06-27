@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 jobpipe/__init__.py
+jobpipe/application_package.py
 jobpipe/browser.py
 jobpipe/classify.py
 jobpipe/cli.py
@@ -10,6 +11,8 @@ jobpipe/ingest.py
 jobpipe/models.py
 jobpipe/packet.py
 jobpipe/parse.py
+jobpipe/profile.md
+jobpipe/recommend.py
 jobpipe/score.py
 jobpipe/tailor.py
 jobpipe/tracker.py
@@ -20,7 +23,11 @@ jobpipe.egg-info/dependency_links.txt
 jobpipe.egg-info/entry_points.txt
 jobpipe.egg-info/requires.txt
 jobpipe.egg-info/top_level.txt
+jobpipe/data/job_sources.yaml
 jobpipe/data/profiles/candidate.yaml
+jobpipe/providers/__init__.py
+jobpipe/providers/greenhouse.py
+jobpipe/providers/lever.py
 jobpipe/role_packs/customer_support.yaml
 jobpipe/role_packs/helpdesk.yaml
 jobpipe/role_packs/junior_dev.yaml
@@ -29,7 +36,14 @@ jobpipe/templates/cover_note.md.j2
 jobpipe/templates/packet.md.j2
 jobpipe/templates/resume.md.j2
 jobpipe/templates/short_answers.md.j2
+tests/test_apply_flow.py
+tests/test_batch_review.py
 tests/test_classify.py
+tests/test_cli_display.py
+tests/test_edit.py
+tests/test_job_discovery.py
+tests/test_migration.py
+tests/test_package_generation.py
 tests/test_packet.py
 tests/test_parse.py
 tests/test_score.py
