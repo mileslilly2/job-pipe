@@ -1,28 +1,40 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .score import score_job_fit_v1
 from .utils import db_path, dump_json, ensure_dir, now_iso
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL DEFAULT 'manual',
+    external_id TEXT NOT NULL DEFAULT '',
     source_url TEXT,
     title TEXT,
     company TEXT,
     location TEXT,
+    remote INTEGER NOT NULL DEFAULT 0,
+    apply_url TEXT,
+    posted_at TEXT,
+    discovered_at TEXT NOT NULL,
+    fit_score INTEGER,
+    status TEXT NOT NULL DEFAULT 'new',
     remote_type TEXT,
     employment_type TEXT,
     salary_text TEXT,
     description TEXT,
     raw_text TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    UNIQUE(provider, external_id)
 );
+
 
 CREATE TABLE IF NOT EXISTS job_analysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,9 +44,12 @@ CREATE TABLE IF NOT EXISTS job_analysis (
     fit_score INTEGER,
     risk_score INTEGER,
     quality_score INTEGER,
+    recommendation TEXT,
+    skip_reason TEXT,
     matched_keywords_json TEXT,
     missing_keywords_json TEXT,
     red_flags_json TEXT,
+    eligibility_flags_json TEXT,
     notes TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
@@ -76,15 +91,99 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 def init_database(path: Path | None = None) -> None:
     with connect(path) as conn:
         conn.executescript(SCHEMA)
+        _migrate_jobs(conn)
+        _migrate_job_analysis(conn)
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_provider_external_id ON jobs(provider, external_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_review_queue ON jobs(status, fit_score DESC, discovered_at ASC, id ASC)")
 
 
-def insert_job(data: dict[str, Any]) -> int:
+def _migrate_jobs(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    additions = {
+        "provider": "TEXT",
+        "external_id": "TEXT",
+        "remote": "INTEGER NOT NULL DEFAULT 0",
+        "apply_url": "TEXT",
+        "posted_at": "TEXT",
+        "discovered_at": "TEXT",
+        "fit_score": "INTEGER",
+        "status": "TEXT NOT NULL DEFAULT 'new'",
+    }
+    for column, ddl in additions.items():
+        if column not in columns:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {ddl}")
+
+    if not columns:
+        return
+
+    conn.execute("UPDATE jobs SET provider = COALESCE(NULLIF(provider, ''), 'manual')")
+    conn.execute("UPDATE jobs SET external_id = COALESCE(NULLIF(external_id, ''), 'legacy:' || id)")
+    conn.execute("UPDATE jobs SET remote = CASE WHEN lower(COALESCE(remote_type, '')) = 'remote' THEN 1 ELSE COALESCE(remote, 0) END")
+    conn.execute("UPDATE jobs SET apply_url = COALESCE(NULLIF(apply_url, ''), source_url)")
+    conn.execute("UPDATE jobs SET discovered_at = COALESCE(NULLIF(discovered_at, ''), created_at, updated_at, CURRENT_TIMESTAMP)")
+    conn.execute("UPDATE jobs SET status = COALESCE(NULLIF(status, ''), 'saved')")
+    conn.execute(
+        """
+        UPDATE jobs
+        SET fit_score = COALESCE(
+            fit_score,
+            (SELECT job_analysis.fit_score FROM job_analysis WHERE job_analysis.job_id = jobs.id)
+        )
+        """
+    )
+
+
+def _migrate_job_analysis(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(job_analysis)").fetchall()}
+    required = {
+        "recommendation": "TEXT",
+        "skip_reason": "TEXT",
+        "eligibility_flags_json": "TEXT",
+    }
+    for column, ddl in required.items():
+        if column not in columns:
+            conn.execute(f"ALTER TABLE job_analysis ADD COLUMN {column} {ddl}")
+
+
+def _manual_external_id(data: dict[str, Any]) -> str:
+    blob = "|".join(
+        str(part or "").strip().lower()
+        for part in (
+            data.get("source_url"),
+            data.get("title"),
+            data.get("company"),
+            data.get("location"),
+            data.get("description"),
+            data.get("raw_text"),
+        )
+    )
+    digest = hashlib.sha1(blob.encode("utf-8")).hexdigest()[:16]
+    return f"manual:{digest}"
+
+
+def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
     timestamp = now_iso()
+    provider = str(data.get("provider") or "manual")
+    external_id = str(data.get("external_id") or data.get("source_url") or _manual_external_id(data))
+    discovered_at = str(data.get("discovered_at") or timestamp)
+    remote = data.get("remote")
+    if remote is None:
+        remote = str(data.get("remote_type") or "").lower() == "remote"
+    apply_url = str(data.get("apply_url") or data.get("source_url") or "")
+    status = review_status or data.get("status") or ("saved" if provider == "manual" else "new")
     payload = {
+        "provider": provider,
+        "external_id": external_id,
         "source_url": data.get("source_url", ""),
         "title": data.get("title", ""),
         "company": data.get("company", ""),
         "location": data.get("location", ""),
+        "remote": 1 if remote else 0,
+        "apply_url": apply_url,
+        "posted_at": data.get("posted_at", ""),
+        "discovered_at": discovered_at,
+        "fit_score": data.get("fit_score"),
+        "status": status,
         "remote_type": data.get("remote_type", ""),
         "employment_type": data.get("employment_type", ""),
         "salary_text": data.get("salary_text", ""),
@@ -97,16 +196,39 @@ def insert_job(data: dict[str, Any]) -> int:
         cur = conn.execute(
             """
             INSERT INTO jobs (
-                source_url, title, company, location, remote_type, employment_type,
+                provider, external_id, source_url, title, company, location, remote, apply_url,
+                posted_at, discovered_at, fit_score, status, remote_type, employment_type,
                 salary_text, description, raw_text, created_at, updated_at
             ) VALUES (
-                :source_url, :title, :company, :location, :remote_type, :employment_type,
+                :provider, :external_id, :source_url, :title, :company, :location, :remote, :apply_url,
+                :posted_at, :discovered_at, :fit_score, :status, :remote_type, :employment_type,
                 :salary_text, :description, :raw_text, :created_at, :updated_at
             )
+            ON CONFLICT(provider, external_id) DO UPDATE SET
+                source_url = CASE WHEN excluded.source_url = '' THEN jobs.source_url ELSE excluded.source_url END,
+                title = CASE WHEN excluded.title = '' THEN jobs.title ELSE excluded.title END,
+                company = CASE WHEN excluded.company = '' THEN jobs.company ELSE excluded.company END,
+                location = CASE WHEN excluded.location = '' THEN jobs.location ELSE excluded.location END,
+                remote = excluded.remote,
+                apply_url = CASE WHEN excluded.apply_url = '' THEN jobs.apply_url ELSE excluded.apply_url END,
+                posted_at = CASE WHEN excluded.posted_at = '' THEN jobs.posted_at ELSE excluded.posted_at END,
+                discovered_at = CASE WHEN jobs.discovered_at IS NULL OR jobs.discovered_at = '' THEN excluded.discovered_at ELSE jobs.discovered_at END,
+                fit_score = excluded.fit_score,
+                status = CASE WHEN jobs.status IN ('', 'new') THEN excluded.status ELSE jobs.status END,
+                remote_type = CASE WHEN excluded.remote_type = '' THEN jobs.remote_type ELSE excluded.remote_type END,
+                employment_type = CASE WHEN excluded.employment_type = '' THEN jobs.employment_type ELSE excluded.employment_type END,
+                salary_text = CASE WHEN excluded.salary_text = '' THEN jobs.salary_text ELSE excluded.salary_text END,
+                description = CASE WHEN excluded.description = '' THEN jobs.description ELSE excluded.description END,
+                raw_text = CASE WHEN excluded.raw_text = '' THEN jobs.raw_text ELSE excluded.raw_text END,
+                updated_at = excluded.updated_at
             """,
             payload,
         )
-        job_id = int(cur.lastrowid)
+        row = conn.execute(
+            "SELECT id FROM jobs WHERE provider = ? AND external_id = ?",
+            (provider, external_id),
+        ).fetchone()
+        job_id = int(row["id"] if row else cur.lastrowid)
         conn.execute(
             """
             INSERT INTO applications (job_id, status, created_at, updated_at)
@@ -127,6 +249,14 @@ def update_job(job_id: int, data: dict[str, Any]) -> None:
         conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", data)
 
 
+def set_review_status(job_id: int, status: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?",
+            (status, now_iso(), job_id),
+        )
+
+
 def fetch_one(query: str, params: tuple[Any, ...] = ()) -> sqlite3.Row | None:
     with connect() as conn:
         return conn.execute(query, params).fetchone()
@@ -141,12 +271,28 @@ def get_job(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM jobs WHERE id = ?", (job_id,))
 
 
+def get_job_by_provider_external_id(provider: str, external_id: str) -> sqlite3.Row | None:
+    return fetch_one("SELECT * FROM jobs WHERE provider = ? AND external_id = ?", (provider, external_id))
+
+
 def get_analysis(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM job_analysis WHERE job_id = ?", (job_id,))
 
 
 def get_application(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM applications WHERE job_id = ?", (job_id,))
+
+
+def set_followup_at(job_id: int, followup_at: str | None) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE applications
+            SET followup_at = ?, updated_at = ?
+            WHERE job_id = ?
+            """,
+            (followup_at, now_iso(), job_id),
+        )
 
 
 def upsert_analysis(job_id: int, analysis: dict[str, Any]) -> None:
@@ -156,17 +302,21 @@ def upsert_analysis(job_id: int, analysis: dict[str, Any]) -> None:
             """
             INSERT INTO job_analysis (
                 job_id, role_type, seniority_level, fit_score, risk_score, quality_score,
-                matched_keywords_json, missing_keywords_json, red_flags_json, notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                recommendation, skip_reason, matched_keywords_json, missing_keywords_json, red_flags_json,
+                eligibility_flags_json, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(job_id) DO UPDATE SET
                 role_type = excluded.role_type,
                 seniority_level = excluded.seniority_level,
                 fit_score = excluded.fit_score,
                 risk_score = excluded.risk_score,
                 quality_score = excluded.quality_score,
+                recommendation = excluded.recommendation,
+                skip_reason = excluded.skip_reason,
                 matched_keywords_json = excluded.matched_keywords_json,
                 missing_keywords_json = excluded.missing_keywords_json,
                 red_flags_json = excluded.red_flags_json,
+                eligibility_flags_json = excluded.eligibility_flags_json,
                 notes = excluded.notes,
                 created_at = excluded.created_at
             """,
@@ -177,9 +327,12 @@ def upsert_analysis(job_id: int, analysis: dict[str, Any]) -> None:
                 analysis["fit_score"],
                 analysis["risk_score"],
                 analysis["quality_score"],
+                analysis["recommendation"],
+                analysis["skip_reason"],
                 dump_json(analysis["matched_keywords"]),
                 dump_json(analysis["missing_keywords"]),
                 dump_json(analysis["red_flags"]),
+                dump_json(analysis["eligibility_flags"]),
                 analysis["notes"],
                 timestamp,
             ),
@@ -234,9 +387,12 @@ def list_jobs() -> list[sqlite3.Row]:
     return fetch_all(
         """
         SELECT
-            jobs.id, jobs.title, jobs.company, jobs.source_url,
-            job_analysis.role_type, job_analysis.fit_score, job_analysis.risk_score, job_analysis.quality_score,
-            applications.status
+            jobs.id, jobs.provider, jobs.external_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
+            jobs.location, jobs.remote, jobs.posted_at, jobs.discovered_at, jobs.fit_score, jobs.description, jobs.raw_text,
+            jobs.status AS review_status,
+            job_analysis.role_type, job_analysis.seniority_level, job_analysis.risk_score, job_analysis.quality_score,
+            job_analysis.recommendation, job_analysis.skip_reason,
+            applications.status, applications.followup_at
         FROM jobs
         LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
         LEFT JOIN applications ON applications.job_id = jobs.id
@@ -245,22 +401,71 @@ def list_jobs() -> list[sqlite3.Row]:
     )
 
 
+def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
+    rows = fetch_all(
+        """
+        SELECT
+            id, provider, external_id, title, company, location, remote, apply_url,
+            posted_at, discovered_at, fit_score, status, description, source_url, raw_text
+        FROM jobs
+        WHERE status = 'new'
+        """
+    )
+    ranked = sorted(
+        rows,
+        key=lambda row: (
+            -score_job_fit_v1(dict(row))[0],
+            str(row["discovered_at"] or ""),
+            int(row["id"]),
+        ),
+    )
+    if limit is not None:
+        ranked = ranked[:limit]
+    return ranked
+
+
 def shortlist_jobs(min_fit: int, max_risk: int, limit: int) -> list[sqlite3.Row]:
     return fetch_all(
         """
         SELECT
             jobs.id, jobs.title, jobs.company,
-            job_analysis.role_type, job_analysis.fit_score, job_analysis.risk_score, job_analysis.quality_score,
+            COALESCE(jobs.fit_score, job_analysis.fit_score, 0) AS fit_score,
+            job_analysis.role_type, job_analysis.seniority_level,
+            job_analysis.risk_score, job_analysis.quality_score,
+            job_analysis.recommendation, job_analysis.skip_reason,
             applications.status,
-            (COALESCE(job_analysis.fit_score, 0) + COALESCE(job_analysis.quality_score, 0) - COALESCE(job_analysis.risk_score, 0)) AS combined_score
+            (COALESCE(jobs.fit_score, job_analysis.fit_score, 0) + COALESCE(job_analysis.quality_score, 0) - COALESCE(job_analysis.risk_score, 0)) AS combined_score
         FROM jobs
-        JOIN job_analysis ON job_analysis.job_id = jobs.id
+        LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
         LEFT JOIN applications ON applications.job_id = jobs.id
-        WHERE job_analysis.fit_score >= ? AND job_analysis.risk_score <= ?
+        WHERE COALESCE(jobs.fit_score, job_analysis.fit_score, 0) >= ?
+          AND COALESCE(job_analysis.risk_score, 0) <= ?
         ORDER BY combined_score DESC, jobs.id ASC
         LIMIT ?
         """,
         (min_fit, max_risk, limit),
+    )
+
+
+def due_followups(limit: int = 20, as_of: str | None = None) -> list[sqlite3.Row]:
+    cutoff = as_of or now_iso()
+    return fetch_all(
+        """
+        SELECT
+            jobs.id, jobs.title, jobs.company, jobs.source_url,
+            applications.status, applications.followup_at, applications.notes,
+            job_analysis.role_type, job_analysis.seniority_level, job_analysis.fit_score, job_analysis.risk_score, job_analysis.quality_score,
+            job_analysis.recommendation, job_analysis.skip_reason
+        FROM applications
+        JOIN jobs ON jobs.id = applications.job_id
+        LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
+        WHERE applications.status = 'applied'
+          AND applications.followup_at IS NOT NULL
+          AND applications.followup_at <= ?
+        ORDER BY applications.followup_at ASC, jobs.id ASC
+        LIMIT ?
+        """,
+        (cutoff, limit),
     )
 
 
@@ -269,7 +474,8 @@ def export_applications_csv(path: Path) -> Path:
         """
         SELECT
             jobs.id, jobs.title, jobs.company, jobs.location, jobs.source_url,
-            job_analysis.role_type, job_analysis.fit_score, job_analysis.risk_score, job_analysis.quality_score,
+            job_analysis.role_type, job_analysis.seniority_level, job_analysis.fit_score, job_analysis.risk_score, job_analysis.quality_score,
+            job_analysis.recommendation, job_analysis.skip_reason,
             applications.status, applications.applied_at, applications.followup_at, applications.notes
         FROM jobs
         LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
@@ -279,10 +485,12 @@ def export_applications_csv(path: Path) -> Path:
     )
     ensure_dir(path.parent)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()) if rows else [
-            "id", "title", "company", "location", "source_url", "role_type",
-            "fit_score", "risk_score", "quality_score", "status", "applied_at", "followup_at", "notes",
-        ])
+        fieldnames = [
+            "id", "title", "company", "location", "source_url", "role_type", "seniority_level",
+            "fit_score", "risk_score", "quality_score", "recommendation", "skip_reason",
+            "status", "applied_at", "followup_at", "notes",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
             writer.writerow(dict(row))

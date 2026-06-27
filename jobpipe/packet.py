@@ -4,20 +4,25 @@ from .models import JobAnalysis, PacketContext
 
 
 def build_packet_context(analysis: JobAnalysis) -> PacketContext:
-    if analysis.risk_score >= 65:
-        return PacketContext(
-            recommendation="Skip",
-            rationale="Risk indicators outweigh the potential fit.",
-            concerns=analysis.red_flags or ["Multiple credibility issues."],
-        )
-    if analysis.fit_score >= 70 and analysis.quality_score >= 55:
-        return PacketContext(
-            recommendation="Apply",
-            rationale="The role looks credible and aligns with the target profile.",
-            concerns=analysis.red_flags,
-        )
+    recommendation = analysis.recommendation
+    reason = analysis.skip_reason
+
+    if reason == "high scam/quality risk":
+        explanation = "This posting has multiple scam or low-quality signals. Do not apply unless the company and application process can be independently verified."
+    elif reason == "seniority mismatch":
+        explanation = "This appears to be a real help desk / IT support role, but it is not a good target for the current candidate profile because it is senior/manager-level."
+    elif reason == "poor fit":
+        explanation = "The role family may be relevant, but the fit score is too low for this candidate profile."
+    elif reason == "unsupported role":
+        explanation = "The posting does not clearly map to a supported role family."
+    elif recommendation == "apply":
+        explanation = "This looks like a strong target based on role family, seniority, fit score, and low risk score."
+    else:
+        explanation = "There is some alignment, but the role needs closer human review."
+
     return PacketContext(
-        recommendation="Maybe apply",
-        rationale="There is some alignment, but the role needs closer human review.",
+        recommendation=recommendation,
+        reason=reason,
+        explanation=explanation,
         concerns=analysis.red_flags,
     )

@@ -1,0 +1,67 @@
+# Starter Greenhouse/Lever sources for `jobpipe ingest`.
+# `company_slug` is the jobpipe identifier for the company.
+# Set `board_token` for Greenhouse or `account` for Lever when the public slug differs.
+# `target_role_families` narrows ingest before scoring so the review queue stays technical.
+
+- provider: greenhouse
+  company: GitLab
+  company_slug: gitlab
+  board_token: gitlab
+  target_role_families:
+    - backend_api
+    - software_engineer
+    - technical_operations
+  enabled: true
+
+- provider: greenhouse
+  company: Stripe
+  company_slug: stripe
+  board_token: stripe
+  target_role_families:
+    - data_engineer
+    - backend_api
+    - python_automation
+    - software_engineer
+  enabled: true
+
+- provider: greenhouse
+  company: Coinbase
+  company_slug: coinbase
+  board_token: coinbase
+  target_role_families:
+    - data_engineer
+    - backend_api
+    - software_engineer
+    - technical_operations
+  enabled: true
+
+- provider: greenhouse
+  company: Postman
+  company_slug: postman
+  board_token: postman
+  target_role_families:
+    - backend_api
+    - software_engineer
+    - data_engineer
+    - qa_automation
+  enabled: true
+
+- provider: lever
+  company: Mistral AI
+  company_slug: mistral
+  account: mistral
+  target_role_families:
+    - ai_evaluation
+    - software_engineer
+    - backend_api
+  enabled: true
+
+- provider: lever
+  company: Wellfound
+  company_slug: angellist
+  account: angellist
+  target_role_families:
+    - junior_software_engineer
+    - software_engineer
+    - backend_api
+  enabled: true

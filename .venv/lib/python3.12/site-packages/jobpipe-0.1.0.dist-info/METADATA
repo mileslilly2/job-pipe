@@ -14,7 +14,7 @@ Requires-Dist: pytest>=8.2; extra == "dev"
 
 # jobpipe
 
-`jobpipe` is a local-first CLI for repetitive job application prep. It stores job postings, analyzes fit/risk/quality, drafts truthful tailored materials, and tracks applications without auto-submitting anything.
+`jobpipe` is a local-first CLI for repetitive job application prep. It stores job postings, ranks them with a deterministic fit score, and lets you review, save, package, or skip jobs without a web UI.
 
 ## Requirements
 
@@ -29,21 +29,62 @@ pip install -e ".[dev]"
 jobpipe init
 ```
 
-## Example flow
+## Supported Providers
+
+Configure local sources in `data/job_sources.yaml`.
+
+- Greenhouse public job board API
+- Lever postings API
+
+## Example Flow
 
 ```fish
-jobpipe add-text --file tests/fixtures/helpdesk_clean.txt
-jobpipe analyze 1
-jobpipe packet 1
-jobpipe tailor 1
+jobpipe init
+jobpipe ingest
+jobpipe review
+jobpipe batch-review
+jobpipe show 1
+jobpipe save 1
+jobpipe package 1
+jobpipe apply-flow 1
+jobpipe skip 2
+jobpipe analyze 3
+jobpipe packet 3
+jobpipe tailor 3
 jobpipe shortlist --min-fit 60 --max-risk 50
-jobpipe status 1 ready_to_apply
+jobpipe status 3 applied
+jobpipe due
 jobpipe export
 ```
+
+## Review Workflow
+
+1. Add one or more provider entries to `data/job_sources.yaml`.
+2. Run `jobpipe ingest` to fetch jobs and score them locally.
+3. Run `jobpipe review` for quick single-job triage, or `jobpipe batch-review` to process the ranked queue in one session.
+4. Use the interactive actions in `batch-review`:
+   - `s` save only
+   - `p` save + package
+   - `a` save + package + apply-flow
+   - `k` skip
+   - `d` details
+   - `o` open URL
+   - `q` quit
+5. Use `jobpipe show <job-id>` for a full local detail view.
+6. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
+7. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually if you want.
 
 ## Commands
 
 - `jobpipe init`
+- `jobpipe ingest`
+- `jobpipe review`
+- `jobpipe batch-review`
+- `jobpipe show JOB_ID`
+- `jobpipe save JOB_ID`
+- `jobpipe package JOB_ID`
+- `jobpipe apply-flow JOB_ID`
+- `jobpipe skip JOB_ID`
 - `jobpipe add-text --file PATH`
 - `jobpipe add-url URL`
 - `jobpipe list`
@@ -52,10 +93,14 @@ jobpipe export
 - `jobpipe tailor JOB_ID`
 - `jobpipe packet JOB_ID`
 - `jobpipe status JOB_ID STATUS`
+- `jobpipe edit JOB_ID [--title ...] [--company ...] [--location ...]`
+- `jobpipe due [--limit INT]`
 - `jobpipe open JOB_ID`
 - `jobpipe export`
 
 ## Notes
 
-- `add-url` uses lightweight extraction. If a page does not parse cleanly, `jobpipe` saves the URL and tells you to paste the job description with `add-text`.
+- Ingest uses only local configuration plus the public Greenhouse/Lever APIs.
+- Fit scoring v1 is deterministic and explainable; no LLMs are used yet.
 - Tailoring is constrained by the candidate profile and never invents paid experience, tools, certifications, or years of experience.
+- `profile.md` is the editable local base resume/profile used for package generation.

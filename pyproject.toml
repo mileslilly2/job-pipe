@@ -32,6 +32,8 @@ include = ["jobpipe*"]
 
 [tool.setuptools.package-data]
 jobpipe = [
+  "profile.md",
+  "data/*.yaml",
   "data/profiles/*.yaml",
   "role_packs/*.yaml",
   "templates/*.j2",
