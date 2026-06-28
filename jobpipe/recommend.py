@@ -14,7 +14,7 @@ def make_recommendation(
     if risk_score >= 75:
         return "skip", "high scam/quality risk"
 
-    if seniority_level in {"senior", "manager", "director"}:
+    if seniority_level in {"senior", "staff", "principal", "manager", "director"}:
         return "skip", "seniority mismatch"
 
     if role_type == "unknown":

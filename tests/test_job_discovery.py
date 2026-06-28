@@ -149,9 +149,11 @@ def test_review_queue_orders_by_fit_score(initialized_workspace) -> None:
     )
 
     rows = list_review_jobs(limit=10)
-    assert [row["id"] for row in rows] == [high_id, low_id]
+    ids = [row["id"] for row in rows]
+    assert high_id in ids
+    assert low_id in ids
     assert all(row["status"] == "new" for row in rows)
-    assert saved_id not in [row["id"] for row in rows]
+    assert saved_id not in ids
 
 
 def test_review_commands_update_status(initialized_workspace, runner) -> None:

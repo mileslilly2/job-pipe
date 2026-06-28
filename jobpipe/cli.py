@@ -11,6 +11,7 @@ from rich.table import Table
 from .browser import open_url
 from .application_package import application_package_paths, build_application_package
 from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, source_identity, source_identity_label
+from .facts import build_fact_report
 from .classify import classify_job, detect_seniority
 from .db import (
     get_analysis,
@@ -185,6 +186,8 @@ def _print_job_details(job_row, profile=None) -> None:
     job = dict(job_row)
     app_row = get_application(job["id"])
     score, notes = _score_notes(job_row, profile)
+    fact_report = build_fact_report(job, profile)
+
     table = Table(title=f"Job {job['id']}", show_header=False)
     table.add_column("Field")
     table.add_column("Value")
@@ -206,6 +209,36 @@ def _print_job_details(job_row, profile=None) -> None:
     for field, value in rows:
         table.add_row(field, value)
     console.print(table)
+
+    facts = Table(title="Job facts", show_header=False)
+    facts.add_column("Field")
+    facts.add_column("Value")
+    job_facts = fact_report.job
+    facts.add_row("Role family", job_facts.role_family)
+    facts.add_row("Seniority", job_facts.seniority)
+    facts.add_row("Experience min years", "None" if job_facts.experience_min_years is None else str(job_facts.experience_min_years))
+    facts.add_row("Remote", "yes" if job_facts.remote else "no")
+    facts.add_row("Skills required", ", ".join(job_facts.skills_required) or "None detected")
+    facts.add_row("Skills preferred", ", ".join(job_facts.skills_preferred) or "None detected")
+    console.print(facts)
+
+    if fact_report.profile is not None:
+        profile_facts = Table(title="Profile facts", show_header=False)
+        profile_facts.add_column("Field")
+        profile_facts.add_column("Value")
+        profile_data = fact_report.profile
+        profile_facts.add_row("Target role families", ", ".join(profile_data.role_families) or "None")
+        profile_facts.add_row("Preferred skills", ", ".join(profile_data.skills_preferred) or "None")
+        profile_facts.add_row("Avoided skills", ", ".join(profile_data.skills_avoided) or "None")
+        profile_facts.add_row("Preferred work styles", ", ".join(profile_data.preferred_work_styles) or "None")
+        profile_facts.add_row("Preferred role levels", ", ".join(profile_data.preferred_role_levels) or "None")
+        profile_facts.add_row("Excluded levels", ", ".join(profile_data.excluded_levels) or "None")
+        profile_facts.add_row("Experience max years", "None" if profile_data.experience_max_years is None else str(profile_data.experience_max_years))
+        console.print(profile_facts)
+
+    _print_fact_section("Matched", fact_report.matched)
+    _print_fact_section("Missing / Mismatched", fact_report.missing_mismatched)
+    _print_fact_section("Concerns", fact_report.concerns)
     if job.get("description"):
         console.print("Description:")
         console.print(job["description"])
@@ -221,6 +254,15 @@ def _print_queue_job(row, profile=None) -> None:
     console.print(f"Location: {row['location'] or 'Unknown'}")
     console.print(f"Fit score: {score}")
     console.print(f"Apply URL: {row['apply_url'] or ''}")
+
+
+def _print_fact_section(title: str, items: list[str]) -> None:
+    console.print(f"{title}:")
+    if items:
+        for item in items:
+            console.print(f"- {item}")
+    else:
+        console.print("- None")
 
 
 def _job_apply_url(job: dict) -> str:
@@ -430,7 +472,7 @@ def analyze(job_id: int) -> None:
     seniority, eligibility_flags = detect_seniority(job, risk_score=risk_score, risk_flags=red_flags)
     active_profile = _load_active_profile()
     display_fit_score, display_fit_notes = score_job_fit_v1(job, profile=active_profile)
-    fit_score, fit_notes = score_fit(job, role_type, seniority, pack, candidate, matched_keywords)
+    fit_score, fit_notes = score_fit(job, role_type, seniority, pack, candidate, matched_keywords, profile=active_profile)
     quality_score, quality_notes = score_quality(job, role_type, seniority)
     recommendation, skip_reason = make_recommendation(fit_score, risk_score, quality_score, role_type, seniority, red_flags)
     analysis = JobAnalysis(

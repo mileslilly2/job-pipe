@@ -91,6 +91,38 @@ class SearchProfile(BaseModel):
     excluded_levels: list[str] = Field(default_factory=list)
 
 
+class JobFacts(BaseModel):
+    role_family: str = "unknown"
+    skills_required: list[str] = Field(default_factory=list)
+    skills_preferred: list[str] = Field(default_factory=list)
+    experience_min_years: int | None = None
+    seniority: str = "unknown"
+    remote: bool = False
+
+
+class ProfileFacts(BaseModel):
+    role_families: list[str] = Field(default_factory=list)
+    skills_preferred: list[str] = Field(default_factory=list)
+    skills_avoided: list[str] = Field(default_factory=list)
+    preferred_work_styles: list[str] = Field(default_factory=list)
+    preferred_role_levels: list[str] = Field(default_factory=list)
+    excluded_levels: list[str] = Field(default_factory=list)
+    experience_max_years: int | None = None
+
+
+class FactReport(BaseModel):
+    job: JobFacts
+    profile: ProfileFacts | None = None
+    matched: list[str] = Field(default_factory=list)
+    missing_mismatched: list[str] = Field(default_factory=list)
+    concerns: list[str] = Field(default_factory=list)
+    score_adjustment: int = 0
+
+    @property
+    def notes(self) -> list[str]:
+        return self.matched + self.missing_mismatched + self.concerns
+
+
 class ParsedJob(BaseModel):
     source_url: str | None = None
     title: str = ""

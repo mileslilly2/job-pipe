@@ -73,6 +73,74 @@
   </div>
 </section>
 
+<section class="grid two">
+  <div class="card stack">
+    <h3>Job facts</h3>
+    <div><strong>Role family:</strong> {{ fact_report.job.role_family }}</div>
+    <div><strong>Seniority:</strong> {{ fact_report.job.seniority }}</div>
+    <div><strong>Experience min years:</strong> {{ fact_report.job.experience_min_years if fact_report.job.experience_min_years is not none else "None" }}</div>
+    <div><strong>Remote:</strong> {{ "yes" if fact_report.job.remote else "no" }}</div>
+    <div><strong>Skills required:</strong> {{ fact_report.job.skills_required | join(", ") if fact_report.job.skills_required else "None detected" }}</div>
+    <div><strong>Skills preferred:</strong> {{ fact_report.job.skills_preferred | join(", ") if fact_report.job.skills_preferred else "None detected" }}</div>
+  </div>
+
+  <div class="card stack">
+    <h3>Profile facts</h3>
+    {% if fact_report.profile %}
+    <div><strong>Target role families:</strong> {{ fact_report.profile.role_families | join(", ") if fact_report.profile.role_families else "None" }}</div>
+    <div><strong>Preferred skills:</strong> {{ fact_report.profile.skills_preferred | join(", ") if fact_report.profile.skills_preferred else "None" }}</div>
+    <div><strong>Avoided skills:</strong> {{ fact_report.profile.skills_avoided | join(", ") if fact_report.profile.skills_avoided else "None" }}</div>
+    <div><strong>Preferred work styles:</strong> {{ fact_report.profile.preferred_work_styles | join(", ") if fact_report.profile.preferred_work_styles else "None" }}</div>
+    <div><strong>Preferred role levels:</strong> {{ fact_report.profile.preferred_role_levels | join(", ") if fact_report.profile.preferred_role_levels else "None" }}</div>
+    <div><strong>Excluded levels:</strong> {{ fact_report.profile.excluded_levels | join(", ") if fact_report.profile.excluded_levels else "None" }}</div>
+    <div><strong>Experience max years:</strong> {{ fact_report.profile.experience_max_years if fact_report.profile.experience_max_years is not none else "None" }}</div>
+    {% else %}
+    <div class="muted">No profile facts available.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid three">
+  <div class="card stack">
+    <h3>Matched</h3>
+    {% if fact_report.matched %}
+      <ul class="compact">
+      {% for note in fact_report.matched %}
+        <li>{{ note }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">No fact matches available.</div>
+    {% endif %}
+  </div>
+
+  <div class="card stack">
+    <h3>Missing / Mismatched</h3>
+    {% if fact_report.missing_mismatched %}
+      <ul class="compact">
+      {% for note in fact_report.missing_mismatched %}
+        <li>{{ note }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">No mismatches detected.</div>
+    {% endif %}
+  </div>
+
+  <div class="card stack">
+    <h3>Concerns</h3>
+    {% if fact_report.concerns %}
+      <ul class="compact">
+      {% for note in fact_report.concerns %}
+        <li>{{ note }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">No concerns detected.</div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="card stack">
   <h3>Description</h3>
   <pre>{{ job.description or job.raw_text or "No description stored." }}</pre>

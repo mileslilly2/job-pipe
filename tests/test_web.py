@@ -132,6 +132,11 @@ def test_job_detail_shows_breakdown_package_paths_and_open_apply(client: TestCli
     assert "Acme Co - Python Automation Engineer" in detail.text
     assert "Fit score" in detail.text
     assert "Learned adjustments" in detail.text
+    assert "Job facts" in detail.text
+    assert "Profile facts" in detail.text
+    assert "Matched" in detail.text
+    assert "Missing / Mismatched" in detail.text
+    assert "Concerns" in detail.text
     assert "job.md" in detail.text
     assert "fit.md" in detail.text
     assert "resume-tailored.md" in detail.text

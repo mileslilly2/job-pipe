@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from .catalog import load_search_profile
-from .db import get_analysis, get_job
+from .db import get_job
+from .facts import build_fact_report
 from .score import RESUME_KEYWORDS, score_job_fit_v1
-from .utils import ensure_dir, load_json, normalize_text, root_dir, slugify
+from .utils import ensure_dir, normalize_text, root_dir, slugify
 
 
 PACKAGE_FOCUS_TERMS = [
@@ -109,19 +110,18 @@ def build_application_package(job_id: int, profile_file: Path | None = None) -> 
     if str(job_row["status"] or "") not in PACKAGE_READY_STATUSES:
         raise ValueError("Run save before package.")
 
-    analysis_row = get_analysis(job_id)
     job = dict(job_row)
     base_profile = load_base_profile(profile_file)
-    fit_score, matched_keywords, missing_keywords, concerns = _fit_context(job, analysis_row)
+    fit_score, fact_report = _fit_context(job)
 
     directory = package_directory_for_job(job)
     ensure_dir(directory)
     paths = application_package_paths(job)
 
     paths.job_md.write_text(_build_job_md(job), encoding="utf-8")
-    paths.fit_md.write_text(_build_fit_md(fit_score, matched_keywords, missing_keywords, concerns), encoding="utf-8")
+    paths.fit_md.write_text(_build_fit_md(fit_score, fact_report), encoding="utf-8")
     paths.resume_tailored_md.write_text(_build_resume_tailored_md(job, base_profile), encoding="utf-8")
-    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, matched_keywords), encoding="utf-8")
+    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, fact_report), encoding="utf-8")
     paths.apply_md.write_text(_build_apply_md(job, job_id), encoding="utf-8")
     return paths
 
@@ -169,42 +169,11 @@ def _parse_base_profile(text: str) -> BaseProfile:
     return BaseProfile(summary=summary, skills=skills, projects=projects, education=education)
 
 
-def _fit_context(job: dict[str, Any], analysis_row) -> tuple[int, list[str], list[str], list[str]]:
-    text = " ".join(
-        str(value or "")
-        for value in (
-            job.get("title"),
-            job.get("company"),
-            job.get("location"),
-            job.get("description"),
-            job.get("raw_text"),
-        )
-    ).lower()
-    computed_score, notes = score_job_fit_v1(job, profile=load_search_profile())
-    fit_score = computed_score
-    matched_keywords = [keyword for keyword in RESUME_KEYWORDS if _phrase_in_text(text, keyword)]
-    missing_keywords = [keyword for keyword in RESUME_KEYWORDS if keyword not in matched_keywords]
-    concerns: list[str] = []
-
-    if analysis_row is not None:
-        red_flags = load_json(analysis_row["red_flags_json"])
-        if isinstance(red_flags, list):
-            concerns.extend(str(flag) for flag in red_flags)
-        skip_reason = analysis_row["skip_reason"]
-        if skip_reason:
-            concerns.append(str(skip_reason))
-        analysis_notes = analysis_row["notes"] or ""
-        if analysis_notes:
-            concerns.extend(note.strip() for note in analysis_notes.split("; ") if note.strip())
-    else:
-        concerns.extend(
-            note
-            for note in notes
-            if note.startswith("-") or "ignored" in note or (note.startswith("role family:") and "(-" in note)
-        )
-
-    concerns = _dedupe_preserve_order(concerns)
-    return fit_score, matched_keywords, missing_keywords, concerns
+def _fit_context(job: dict[str, Any]) -> tuple[int, Any]:
+    profile = load_search_profile()
+    computed_score, _notes = score_job_fit_v1(job, profile=profile)
+    fact_report = build_fact_report(job, profile)
+    return computed_score, fact_report
 
 
 def _build_job_md(job: dict[str, Any]) -> str:
@@ -224,20 +193,20 @@ def _build_job_md(job: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_fit_md(fit_score: int, matched_keywords: list[str], missing_keywords: list[str], concerns: list[str]) -> str:
+def _build_fit_md(fit_score: int, fact_report) -> str:
     lines = [
         "# Fit",
         "",
         f"- Fit score: {fit_score}/100",
         "",
-        "## Matched keywords",
+        "## Matched",
         "",
     ]
-    lines.extend(f"- {keyword}" for keyword in (matched_keywords or ["None"]))
-    lines.extend(["", "## Missing keywords", ""])
-    lines.extend(f"- {keyword}" for keyword in (missing_keywords or ["None"]))
-    lines.extend(["", "## Concerns / penalties", ""])
-    lines.extend(f"- {concern}" for concern in (concerns or ["None recorded."]))
+    lines.extend(f"- {item}" for item in (fact_report.matched or ["None"]))
+    lines.extend(["", "## Missing / Mismatched", ""])
+    lines.extend(f"- {item}" for item in (fact_report.missing_mismatched or ["None"]))
+    lines.extend(["", "## Concerns", ""])
+    lines.extend(f"- {item}" for item in (fact_report.concerns or ["None recorded."]))
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -281,10 +250,10 @@ def _build_resume_tailored_md(job: dict[str, Any], base_profile: BaseProfile) ->
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_cover_note_md(job: dict[str, Any], fit_score: int, matched_keywords: list[str]) -> str:
+def _build_cover_note_md(job: dict[str, Any], fit_score: int, fact_report) -> str:
     company = job.get("company") or "your team"
     title = job.get("title") or "role"
-    focus = ", ".join(matched_keywords[:3]) if matched_keywords else "practical problem solving"
+    focus = ", ".join(item.split(": ", 1)[-1] for item in fact_report.matched[:3]) if fact_report.matched else "practical problem solving"
     lines = [
         f"I am writing to apply for the {title} role at {company}. The posting looks like a good fit for my background in {focus}.",
         "",

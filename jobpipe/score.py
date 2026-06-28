@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .classify import detect_seniority
+from .facts import ROLE_FAMILY_SCORES, build_fact_report, classify_role_family as _classify_role_family, extract_job_facts
 from .models import CandidateProfile, ParsedJob, RolePack, SearchProfile
 
 
@@ -17,44 +17,6 @@ RESUME_KEYWORDS = [
     "ai evaluation",
     "react",
     "api",
-]
-
-ROLE_FAMILY_SCORES = {
-    "data_engineer": 44,
-    "python_automation": 40,
-    "backend_api": 38,
-    "software_engineer": 34,
-    "junior_software_engineer": 36,
-    "ai_evaluation": 36,
-    "qa_automation": 36,
-    "technical_operations": 26,
-    "help_desk": -38,
-    "customer_support": -38,
-    "it_support": -36,
-    "sales": -40,
-    "clinical_admin": -34,
-    "manager": -44,
-    "unknown": 0,
-}
-
-NEGATIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("help_desk", ("help desk", "helpdesk", "service desk", "desk support")),
-    ("customer_support", ("customer support", "customer success", "client support", "customer care")),
-    ("it_support", ("it support", "technical support", "support engineer", "desktop support", "systems support")),
-    ("sales", ("business development", "account executive", "sales", "sdr", "bdr", "solutions consultant")),
-    ("clinical_admin", ("clinical", "nurse", "patient", "medical assistant", "healthcare", "administrative")),
-    ("manager", ("engineering manager", "product manager", "project manager", "program manager", "manager", "director", "head of")),
-]
-
-POSITIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("data_engineer", ("data engineer", "analytics engineer", "data platform", "data pipeline", "etl", "airflow", "dbt", "warehouse")),
-    ("ai_evaluation", ("ai evaluation", "model evaluation", "llm evaluation", "evals", "evaluation engineer")),
-    ("qa_automation", ("qa automation", "test automation", "sdet", "quality engineer", "selenium", "playwright", "cypress", "pytest")),
-    ("technical_operations", ("devops engineer", "site reliability engineer", "sre", "platform operations", "release engineer", "systems engineer", "technical operations", "ops engineer", "infrastructure engineer", "technical operations engineer")),
-    ("python_automation", ("python automation", "automation engineer", "workflow automation", "process automation", "python developer", "scripting")),
-    ("junior_software_engineer", ("junior software engineer", "software engineer i", "software engineer 1", "entry level software engineer", "associate software engineer", "junior developer", "new grad software engineer")),
-    ("software_engineer", ("software engineer", "software developer", "full stack engineer", "application engineer", "application developer")),
-    ("backend_api", ("backend engineer", "backend developer", "backend", "api", "microservices", "services", "platform engineer")),
 ]
 
 TECHNICAL_OPS_TERMS = (
@@ -71,8 +33,18 @@ TECHNICAL_OPS_TERMS = (
 
 PROGRAMMING_TERMS = ("python", "automation", "scripting", "cli", "pipeline", "pipelines", "sql", "api", "testing", "terraform", "bash", "git")
 
+classify_role_family = _classify_role_family
 
-def score_fit(job: ParsedJob, role_type: str, seniority: str, pack: RolePack | None, candidate: CandidateProfile, matched_keywords: list[str]) -> tuple[int, list[str]]:
+
+def score_fit(
+    job: ParsedJob,
+    role_type: str,
+    seniority: str,
+    pack: RolePack | None,
+    candidate: CandidateProfile,
+    matched_keywords: list[str],
+    profile: SearchProfile | None = None,
+) -> tuple[int, list[str]]:
     text = f"{job.title} {job.description}".lower()
     score = 20
     notes: list[str] = []
@@ -107,6 +79,12 @@ def score_fit(job: ParsedJob, role_type: str, seniority: str, pack: RolePack | N
         notes.append("seniority mismatch")
     elif seniority in {"entry_level", "junior"}:
         score += 6
+
+    fact_report = build_fact_report(job, profile) if profile is not None else None
+    if fact_report is not None:
+        score += fact_report.score_adjustment
+        notes.extend(fact_report.notes)
+
     if role_type == "unknown":
         score -= 15
     return max(0, min(score, 100)), notes
@@ -193,7 +171,7 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
     score = 10
     notes: list[str] = ["base score: 10"]
 
-    family, family_matches, family_reason = _classify_role_family(text)
+    family, family_matches, family_reason = _classify_role_family(job)
     family_score = ROLE_FAMILY_SCORES.get(family, 0)
     score += family_score
     notes.append(f"role family: {family} ({family_score:+d})")
@@ -211,12 +189,15 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
         for keyword in keyword_hits:
             notes.append(f"+4 keyword match: {keyword}")
 
-    if _has_phrase(text, "junior"):
-        score += 4
-        notes.append("+4 boost: junior")
-    if _has_phrase(text, "entry level"):
-        score += 6
-        notes.append("+6 boost: entry level")
+    job_facts = extract_job_facts(job)
+    if job_facts.seniority in {"junior", "entry", "internship", "apprenticeship"}:
+        bonus = 6 if job_facts.seniority in {"entry", "internship"} else 4
+        score += bonus
+        notes.append(f"+{bonus} boost: {job_facts.seniority}")
+    if job_facts.seniority in {"senior", "staff", "principal", "manager"}:
+        penalty = 10 if job_facts.seniority == "senior" else 14
+        score -= penalty
+        notes.append(f"-{penalty} penalty: seniority signal '{job_facts.seniority}'")
 
     if remote_flag or _has_phrase(text, "remote"):
         score += 5
@@ -225,18 +206,9 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
         score += 2
         notes.append("+2 boost: hybrid-friendly")
 
-    for phrase, penalty in {
-        "senior": 10,
-        "staff": 14,
-        "principal": 14,
-        "director": 12,
-    }.items():
-        if _has_phrase(text, phrase):
-            score -= penalty
-            notes.append(f"-{penalty} penalty: seniority signal '{phrase}'")
-
     if profile:
-        if family in {value.strip().lower() for value in profile.target_role_families if value and value.strip()}:
+        profile_target_families = {value.strip().lower() for value in profile.target_role_families if value and value.strip()}
+        if family in profile_target_families:
             score += 8
             notes.append("+8 profile boost: target role family")
 
@@ -253,35 +225,26 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
             for keyword in profile_negative_matches:
                 notes.append(f"-{min(6, penalty)} profile negative keyword: {keyword}")
 
-        parsed_job = ParsedJob(
-            title=_field(job, "title"),
-            company=_field(job, "company"),
-            location=_field(job, "location"),
-            description=_field(job, "description"),
-            remote_type="remote" if remote_flag else _field(job, "remote_type"),
-            employment_type=_field(job, "employment_type"),
-        )
-        detected_level, level_flags = detect_seniority(parsed_job)
-        if level_flags:
-            notes.extend(level_flags)
-        preferred_levels = {value.strip().lower() for value in profile.preferred_role_levels if value and value.strip()}
-        excluded_levels = {value.strip().lower() for value in profile.excluded_levels if value and value.strip()}
-        preferred_work_styles = {value.strip().lower() for value in profile.preferred_work_styles if value and value.strip()}
-        if detected_level in preferred_levels:
-            score += 6
-            notes.append(f"+6 profile boost: preferred role level {detected_level}")
-        if detected_level in excluded_levels:
-            score -= 30
-            notes.append(f"-30 profile penalty: excluded role level {detected_level}")
-        if remote_flag and "remote" in preferred_work_styles:
+        report = build_fact_report(job, profile)
+        if report.notes:
+            notes.extend(report.notes)
+        score += report.score_adjustment
+
+        if job_facts.remote and "remote" in {value.strip().lower() for value in profile.preferred_work_styles if value and value.strip()}:
             score += 4
             notes.append("+4 profile boost: remote work style")
-        if "hybrid" in text and "hybrid" in preferred_work_styles:
-            score += 3
-            notes.append("+3 profile boost: hybrid work style")
-        if "contract" in detected_level and "contractor" in preferred_levels:
-            score += 4
-            notes.append("+4 profile boost: contractor level")
+        elif not job_facts.remote and "remote" in {value.strip().lower() for value in profile.preferred_work_styles if value and value.strip()}:
+            score -= 3
+            notes.append("-3 profile penalty: remote work style")
+
+        preferred_levels = {value.strip().lower() for value in profile.preferred_role_levels if value and value.strip()}
+        excluded_levels = {value.strip().lower() for value in profile.excluded_levels if value and value.strip()}
+        if job_facts.seniority in preferred_levels:
+            score += 6
+            notes.append(f"+6 profile boost: preferred role level {job_facts.seniority}")
+        if job_facts.seniority in excluded_levels:
+            score -= 30
+            notes.append(f"-30 profile penalty: excluded role level {job_facts.seniority}")
 
     # Learned adjustments
     if learned_weights:
@@ -290,7 +253,7 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
             adj = role_adjustments[family]
             score += adj
             notes.append(f"{adj:+d} learned adjustment: role family '{family}'")
-        
+
         keyword_adjustments = learned_weights.get("keywords", {})
         for kw in keyword_hits:
             if kw in keyword_adjustments:
@@ -303,19 +266,6 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
     return score, notes
 
 
-def classify_role_family(job: Any) -> tuple[str, list[str], str | None]:
-    text = " ".join(
-        str(value or "")
-        for value in [
-            _field(job, "title"),
-            _field(job, "company"),
-            _field(job, "location"),
-            _field(job, "description"),
-        ]
-    ).lower()
-    return _classify_role_family(text)
-
-
 def _field(job: Any, name: str) -> str:
     if isinstance(job, dict):
         return str(job.get(name) or "")
@@ -326,26 +276,6 @@ def _remote_flag(job: Any) -> bool:
     if isinstance(job, dict):
         return bool(job.get("remote"))
     return bool(getattr(job, "remote", False) or getattr(job, "remote_type", "") == "remote")
-
-
-def _classify_role_family(text: str) -> tuple[str, list[str], str | None]:
-    for family, phrases in NEGATIVE_ROLE_FAMILY_RULES:
-        matched = [phrase for phrase in phrases if _has_phrase(text, phrase)]
-        if matched:
-            return family, matched, None
-
-    for family, phrases in POSITIVE_ROLE_FAMILY_RULES:
-        matched = [phrase for phrase in phrases if _has_phrase(text, phrase)]
-        if not matched:
-            continue
-        if family == "technical_operations" and not _has_programming_signals(text):
-            return "unknown", [], "technical operations signals ignored: not programming-heavy"
-        return family, matched, None
-
-    if any(_has_phrase(text, phrase) for phrase in TECHNICAL_OPS_TERMS):
-        return "unknown", [], "technical operations signals ignored: not programming-heavy"
-
-    return "unknown", [], None
 
 
 def _has_programming_signals(text: str) -> bool:

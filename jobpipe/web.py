@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .application_package import application_package_paths, build_application_package
+from .catalog import load_search_profile
+from .facts import build_fact_report
 from .browser import open_url
 from .db import due_followups, fetch_one, get_analysis, get_application, get_job, insert_feedback, list_jobs, set_review_status
 from .learn import load_learned_weights, sync_weights
@@ -160,7 +162,8 @@ def _is_safe_local_path(value: str | None) -> bool:
 
 def _job_score(job: dict[str, Any]) -> tuple[int, list[str]]:
     learned_weights = load_learned_weights()
-    return score_job_fit_v1(job, learned_weights=learned_weights)
+    profile = load_search_profile()
+    return score_job_fit_v1(job, learned_weights=learned_weights, profile=profile)
 
 
 def _job_apply_url(job: dict[str, Any]) -> str:
@@ -182,10 +185,11 @@ def _package_paths(job: dict[str, Any]) -> dict[str, str]:
 
 def _decorate_jobs(rows) -> list[dict[str, Any]]:
     learned_weights = load_learned_weights()
+    profile = load_search_profile()
     jobs: list[dict[str, Any]] = []
     for row in rows:
         job = dict(row)
-        score, notes = score_job_fit_v1(job, learned_weights=learned_weights)
+        score, notes = score_job_fit_v1(job, learned_weights=learned_weights, profile=profile)
         job["score"] = score
         job["score_notes"] = notes
         job["display_status"] = _display_status(job)
@@ -283,6 +287,8 @@ def _job_detail_context(job_id: int) -> dict[str, Any]:
     score, notes = _job_score(job)
     learned_adjustments = [note for note in notes if "learned adjustment:" in note]
     package_paths = _package_paths(job)
+    profile = load_search_profile()
+    fact_report = build_fact_report(job, profile)
 
     return {
         "job": {
@@ -297,6 +303,7 @@ def _job_detail_context(job_id: int) -> dict[str, Any]:
         "packet": dict(packet_row) if packet_row else None,
         "package_paths": package_paths,
         "learned_adjustments": learned_adjustments,
+        "fact_report": fact_report,
     }
 
 
