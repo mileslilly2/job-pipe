@@ -1,23 +1,78 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .application_package import application_package_paths, build_application_package
-from .catalog import load_search_profile
-from .facts import build_fact_report
 from .browser import open_url
+from .catalog import load_search_profile
 from .db import due_followups, fetch_one, get_analysis, get_application, get_job, insert_feedback, list_jobs, set_review_status
+from .facts import build_fact_report
 from .learn import load_learned_weights, sync_weights
 from .score import score_job_fit_v1
+from .tracker import update_status
 from .utils import load_json, package_dir
 
 HOST = "127.0.0.1"
 PORT = 8765
+
+ACTIVE_BUCKETS = {"new", "saved", "packaged", "assessment", "applied", "interview", "offer"}
+ASSESSMENT_STATUSES = {"analyzed", "ready_to_apply"}
+KANBAN_COLUMN_ORDER = ("new", "saved", "packaged", "assessment", "applied", "interview", "offer", "rejected", "skipped")
+KANBAN_COLUMNS = {
+    "new": {"label": "New", "description": "Fresh jobs pulled into the workspace."},
+    "saved": {"label": "Saved", "description": "Jobs worth keeping but not yet packaged."},
+    "packaged": {"label": "Packaged", "description": "Jobs with generated application materials."},
+    "assessment": {"label": "Assessment", "description": "Jobs under review or ready to apply."},
+    "applied": {"label": "Applied", "description": "Submitted applications waiting on a response."},
+    "interview": {"label": "Interview", "description": "Pipeline jobs in interview stages."},
+    "offer": {"label": "Offer", "description": "Late-stage opportunities."},
+    "rejected": {"label": "Rejected", "description": "Closed-out jobs that were declined or rejected."},
+    "skipped": {"label": "Skipped", "description": "Jobs intentionally ignored or skipped."},
+}
+SAVED_VIEWS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "High Fit New Jobs",
+        "description": "New jobs with a strong fit score.",
+        "filters": {"status": "new", "min_score": 70},
+    },
+    {
+        "name": "Saved Not Packaged",
+        "description": "Saved jobs that still need a package.",
+        "filters": {"status": "saved", "packaged": 0},
+    },
+    {
+        "name": "Packaged Not Applied",
+        "description": "Jobs with generated materials that have not been submitted.",
+        "filters": {"status": "packaged"},
+    },
+    {
+        "name": "Applied Awaiting Response",
+        "description": "Submitted jobs waiting on the employer.",
+        "filters": {"status": "applied"},
+    },
+    {
+        "name": "Follow-Up Due",
+        "description": "Applied jobs with overdue follow-up dates.",
+        "filters": {"status": "applied", "followup_due": 1},
+    },
+    {
+        "name": "Interview Pipeline",
+        "description": "Jobs currently in the interview stage.",
+        "filters": {"status": "interview"},
+    },
+    {
+        "name": "Rejected Archive",
+        "description": "Rejected jobs kept for reference.",
+        "filters": {"status": "rejected"},
+    },
+)
 
 
 def _template_dir() -> Path:
@@ -52,6 +107,8 @@ def create_app() -> FastAPI:
         min_score: int = 0,
         remote_only: bool = False,
         q: str | None = None,
+        packaged: str | None = None,
+        followup_due: str | None = None,
     ):
         jobs = _decorate_jobs(list_jobs())
         jobs = _filter_jobs(
@@ -62,12 +119,15 @@ def create_app() -> FastAPI:
             min_score=min_score,
             remote_only=remote_only,
             query=q,
+            packaged=_parse_bool(packaged),
+            followup_due=_parse_bool(followup_due),
         )
         return templates.TemplateResponse(
             request,
             "jobs.html",
             {
                 "jobs": jobs,
+                "status_options": _jobs_status_options(),
                 "filters": {
                     "status": status or "",
                     "provider": provider or "",
@@ -75,7 +135,55 @@ def create_app() -> FastAPI:
                     "min_score": min_score,
                     "remote_only": remote_only,
                     "q": q or "",
+                    "packaged": _parse_bool(packaged),
+                    "followup_due": _parse_bool(followup_due),
                 },
+            },
+        )
+
+    @app.get("/kanban", response_class=HTMLResponse)
+    def kanban(request: Request):
+        jobs = [job for job in _decorate_jobs(list_jobs()) if _job_bucket(job) != "archived"]
+        columns = [
+            {
+                "key": key,
+                "label": KANBAN_COLUMNS[key]["label"],
+                "description": KANBAN_COLUMNS[key]["description"],
+                "jobs": sorted(
+                    [job for job in jobs if _job_bucket(job) == key],
+                    key=lambda job: (
+                        -int(job.get("score") or 0),
+                        str(job.get("discovered_at") or ""),
+                        int(job.get("id") or 0),
+                    ),
+                ),
+            }
+            for key in KANBAN_COLUMN_ORDER
+        ]
+        return templates.TemplateResponse(
+            request,
+            "kanban.html",
+            {
+                "columns": columns,
+            },
+        )
+
+    @app.get("/views", response_class=HTMLResponse)
+    def views(request: Request):
+        views = [
+            {
+                "name": view["name"],
+                "description": view["description"],
+                "url": _jobs_url(**view["filters"]),
+                "filters": view["filters"],
+            }
+            for view in SAVED_VIEWS
+        ]
+        return templates.TemplateResponse(
+            request,
+            "views.html",
+            {
+                "views": views,
             },
         )
 
@@ -118,6 +226,12 @@ def create_app() -> FastAPI:
         if not apply_url:
             raise HTTPException(status_code=400, detail="No apply URL stored for this job.")
         open_url(apply_url)
+        return _redirect(next, f"/jobs/{job_id}")
+
+    @app.post("/jobs/{job_id}/status/{status}")
+    def move_status(job_id: int, status: str, next: str | None = None):
+        _require_job(job_id)
+        _set_status(job_id, status)
         return _redirect(next, f"/jobs/{job_id}")
 
     @app.get("/followups", response_class=HTMLResponse)
@@ -170,6 +284,18 @@ def _job_apply_url(job: dict[str, Any]) -> str:
     return str(job.get("apply_url") or job.get("source_url") or "")
 
 
+def _jobs_url(**params: Any) -> str:
+    query_items: list[tuple[str, str]] = []
+    for key, value in params.items():
+        if value is None or value == "":
+            continue
+        if isinstance(value, bool):
+            query_items.append((key, "1" if value else "0"))
+        else:
+            query_items.append((key, str(value)))
+    return "/jobs" if not query_items else f"/jobs?{urlencode(query_items)}"
+
+
 def _package_paths(job: dict[str, Any]) -> dict[str, str]:
     paths = application_package_paths(job)
     artifacts = {
@@ -194,6 +320,7 @@ def _decorate_jobs(rows) -> list[dict[str, Any]]:
         job["score_notes"] = notes
         job["display_status"] = _display_status(job)
         job["has_package"] = bool(_package_paths(job))
+        job["bucket"] = _job_bucket(job)
         jobs.append(job)
     return jobs
 
@@ -207,17 +334,26 @@ def _filter_jobs(
     min_score: int,
     remote_only: bool,
     query: str | None,
+    packaged: bool | None = None,
+    followup_due: bool | None = None,
+    active_only: bool = True,
 ) -> list[dict[str, Any]]:
     filtered = jobs
-    if status:
-        needle = status.strip().lower()
-        filtered = [job for job in filtered if str(job.get("display_status") or "").strip().lower() == needle]
+    needle = status.strip().lower() if status else ""
+    if active_only and needle not in {"rejected", "skipped"}:
+        filtered = [job for job in filtered if job.get("bucket") in ACTIVE_BUCKETS]
+    if needle:
+        filtered = [job for job in filtered if _job_matches_status(job, needle)]
     if provider:
         needle = provider.strip().lower()
         filtered = [job for job in filtered if needle in str(job.get("provider") or "").lower()]
     if company:
         needle = company.strip().lower()
         filtered = [job for job in filtered if needle in str(job.get("company") or "").lower()]
+    if packaged is not None:
+        filtered = [job for job in filtered if bool(job.get("has_package")) is packaged]
+    if followup_due is not None:
+        filtered = [job for job in filtered if _job_followup_due(job) is followup_due]
     if min_score:
         filtered = [job for job in filtered if int(job.get("score") or 0) >= min_score]
     if remote_only:
@@ -248,6 +384,21 @@ def _filter_jobs(
     )
 
 
+def _jobs_status_options() -> list[tuple[str, str]]:
+    return [
+        ("", "All active"),
+        ("new", "New"),
+        ("saved", "Saved"),
+        ("packaged", "Packaged"),
+        ("assessment", "Assessment"),
+        ("applied", "Applied"),
+        ("interview", "Interview"),
+        ("offer", "Offer"),
+        ("rejected", "Rejected"),
+        ("skipped", "Skipped"),
+    ]
+
+
 def _dashboard_summary(jobs: list[dict[str, Any]]) -> dict[str, int]:
     total = len(jobs)
     new_jobs = sum(1 for job in jobs if _display_status(job) == "new")
@@ -270,9 +421,101 @@ def _dashboard_summary(jobs: list[dict[str, Any]]) -> dict[str, int]:
 def _display_status(job: dict[str, Any]) -> str:
     application_status = str(job.get("status") or "").strip().lower()
     review_status = str(job.get("review_status") or "").strip().lower()
-    if application_status == "applied":
+    if application_status in {"applied", "rejected", "interview", "offer", "archived", "ignored"}:
+        return application_status
+    if application_status in ASSESSMENT_STATUSES:
         return application_status
     return review_status or application_status
+
+
+def _job_bucket(job: dict[str, Any]) -> str:
+    display_status = _display_status(job)
+    if display_status == "skipped":
+        return "skipped"
+    if display_status == "rejected":
+        return "rejected"
+    if display_status == "interview":
+        return "interview"
+    if display_status == "offer":
+        return "offer"
+    if display_status == "applied":
+        return "applied"
+    if display_status in ASSESSMENT_STATUSES:
+        return "assessment"
+    if job.get("has_package"):
+        return "packaged"
+    if display_status == "saved":
+        return "saved"
+    if display_status == "new":
+        return "new"
+    if display_status in {"archived", "ignored"}:
+        return display_status
+    return "saved" if job.get("has_package") else display_status or "new"
+
+
+def _job_matches_status(job: dict[str, Any], status: str) -> bool:
+    if status in {"new", "saved", "packaged", "assessment", "applied", "interview", "offer", "rejected", "skipped"}:
+        return _job_bucket(job) == status
+    if status in {"analyzed", "ready_to_apply"}:
+        return _display_status(job) == status
+    if status == "archived":
+        return _display_status(job) == "archived"
+    if status == "ignored":
+        return _display_status(job) == "ignored"
+    return _display_status(job) == status
+
+
+def _parse_bool(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    needle = value.strip().lower()
+    if needle == "":
+        return None
+    if needle in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if needle in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _job_followup_due(job: dict[str, Any]) -> bool:
+    if str(job.get("status") or "").strip().lower() != "applied":
+        return False
+    followup_at = str(job.get("followup_at") or "").strip()
+    if not followup_at:
+        return False
+    try:
+        cutoff = datetime.now(timezone.utc)
+        parsed = datetime.fromisoformat(followup_at.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed <= cutoff
+    except ValueError:
+        return False
+
+
+def _set_status(job_id: int, status: str) -> None:
+    normalized = status.strip().lower()
+    if normalized == "saved":
+        set_review_status(job_id, "saved")
+        insert_feedback(job_id, "saved")
+        sync_weights()
+        return
+    if normalized == "skipped":
+        set_review_status(job_id, "skipped")
+        insert_feedback(job_id, "skipped")
+        sync_weights()
+        return
+    if normalized == "new":
+        set_review_status(job_id, "new")
+        return
+    if normalized in {"analyzed", "ready_to_apply", "applied", "rejected", "interview", "offer", "ignored", "archived"}:
+        update_status(job_id, normalized)
+        if normalized in {"rejected", "interview", "offer"}:
+            insert_feedback(job_id, normalized)
+            sync_weights()
+        return
+    raise HTTPException(status_code=400, detail=f"Unsupported status: {status}")
 
 
 def _job_detail_context(job_id: int) -> dict[str, Any]:

@@ -138,9 +138,12 @@ jobpipe export
 
 ## Web UI
 
-- `jobpipe web` starts a local-only FastAPI server on `127.0.0.1:8765`.
+- `python3 -m jobpipe.cli web` starts a local-only FastAPI server on `127.0.0.1:8765`.
+- `jobpipe web` is the equivalent CLI entry point.
 - The browser opens automatically unless `--no-open` is passed.
-- The UI stays read-only except for the existing save, skip, package, and open-apply actions.
+- Open `/kanban` for the pipeline board.
+- Open `/views` for saved job filters that link back to `/jobs`.
+- The UI stays read-only except for the existing save, skip, package, open-apply, and status move actions.
 
 ## Commands
 

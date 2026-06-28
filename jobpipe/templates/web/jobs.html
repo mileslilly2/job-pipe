@@ -1,15 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card">
+<section class="card stack">
+  <div class="actions">
+    <a class="button" href="/kanban">Open kanban</a>
+    <a class="button" href="/views">Saved views</a>
+  </div>
   <h2>Jobs</h2>
+  <div class="muted">Active jobs are shown by default. Skipped, rejected, and archived jobs stay hidden until you explicitly choose them.</div>
+</section>
+
+<section class="card">
   <form method="get" class="filters">
     <label>
       Status
       <select name="status">
-        <option value="">All</option>
-        {% for value in ["new", "saved", "skipped", "applied"] %}
-        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value }}</option>
+        {% for value, label in status_options %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
+      </select>
+    </label>
+    <label>
+      Package state
+      <select name="packaged">
+        <option value="" {% if filters.packaged is none %}selected{% endif %}>Any</option>
+        <option value="1" {% if filters.packaged is sameas true %}selected{% endif %}>Packaged only</option>
+        <option value="0" {% if filters.packaged is sameas false %}selected{% endif %}>Not packaged</option>
+      </select>
+    </label>
+    <label>
+      Follow-up
+      <select name="followup_due">
+        <option value="" {% if filters.followup_due is none %}selected{% endif %}>Any</option>
+        <option value="1" {% if filters.followup_due is sameas true %}selected{% endif %}>Due only</option>
+        <option value="0" {% if filters.followup_due is sameas false %}selected{% endif %}>Not due</option>
       </select>
     </label>
     <label>
@@ -39,7 +62,7 @@
   </form>
 </section>
 
-<section class="card">
+<section class="card stack">
   <div class="muted">{{ jobs|length }} job(s) shown.</div>
   <div class="table-wrap">
     <table>
@@ -62,7 +85,10 @@
           <td>{{ job.company }}</td>
           <td>{{ job.title }}</td>
           <td>{{ job.location }}</td>
-          <td><span class="pill">{{ job.display_status }}</span>{% if job.has_package %} <span class="pill good">packaged</span>{% endif %}</td>
+          <td>
+            <span class="pill">{{ job.bucket }}</span>
+            {% if job.has_package %}<span class="pill good">packaged</span>{% endif %}
+          </td>
           <td>{{ job.provider }}</td>
           <td>{{ job.discovered_at }}</td>
           <td>

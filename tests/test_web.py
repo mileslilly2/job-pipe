@@ -72,17 +72,17 @@ def test_dashboard_jobs_filters_and_actions(client: TestClient) -> None:
     assert dashboard.status_code == 200
     assert "Total jobs" in dashboard.text
     assert "Packaged jobs" in dashboard.text
-    assert "Total jobs</div><div class=\"stat\">4</div>" in dashboard.text
-    assert "Saved jobs</div><div class=\"stat\">1</div>" in dashboard.text
-    assert "Packaged jobs</div><div class=\"stat\">1</div>" in dashboard.text
-    assert "Applied jobs</div><div class=\"stat\">1</div>" in dashboard.text
-    assert "Skipped jobs</div><div class=\"stat\">1</div>" in dashboard.text
-    assert "Due follow-ups</div><div class=\"stat\">1</div>" in dashboard.text
+    assert 'Total jobs</div><div class="stat">4</div>' in dashboard.text
+    assert 'Saved jobs</div><div class="stat">1</div>' in dashboard.text
+    assert 'Packaged jobs</div><div class="stat">1</div>' in dashboard.text
+    assert 'Applied jobs</div><div class="stat">1</div>' in dashboard.text
+    assert 'Skipped jobs</div><div class="stat">1</div>' in dashboard.text
+    assert 'Due follow-ups</div><div class="stat">1</div>' in dashboard.text
 
     jobs_page = client.get(
         "/jobs",
         params={
-            "status": "saved",
+            "status": "packaged",
             "provider": "greenhouse",
             "company": "Beta",
             "min_score": 0,
@@ -101,6 +101,77 @@ def test_dashboard_jobs_filters_and_actions(client: TestClient) -> None:
     assert get_job(job_saved)["status"] == "saved"
     assert get_job(job_skipped)["status"] == "skipped"
     assert get_application(job_applied)["status"] == "applied"
+
+
+def test_kanban_route_renders_and_move_updates_status(client: TestClient) -> None:
+    job_id = insert_job(_job_payload("Kanban Co", "Platform Engineer", external_id="job-kanban"), review_status="new")
+
+    kanban = client.get("/kanban")
+    assert kanban.status_code == 200
+    assert "Kanban" in kanban.text
+    assert "New" in kanban.text
+    assert "Mark applied" in kanban.text
+    assert "Assessment" in kanban.text
+
+    move = client.post(
+        f"/jobs/{job_id}/status/interview?next=/kanban",
+        follow_redirects=False,
+    )
+    assert move.status_code == 303
+    assert move.headers["location"] == "/kanban"
+
+    application_row = get_application(job_id)
+    assert application_row is not None
+    assert application_row["status"] == "interview"
+
+
+def test_views_page_lists_saved_views(client: TestClient) -> None:
+    resp = client.get("/views")
+    assert resp.status_code == 200
+    for name in [
+        "High Fit New Jobs",
+        "Saved Not Packaged",
+        "Packaged Not Applied",
+        "Applied Awaiting Response",
+        "Follow-Up Due",
+        "Interview Pipeline",
+        "Rejected Archive",
+    ]:
+        assert name in resp.text
+    assert "status=new" in resp.text
+    assert "min_score=70" in resp.text
+    assert "status=rejected" in resp.text
+
+
+def test_jobs_hide_skipped_and_rejected_until_explicit(client: TestClient) -> None:
+    job_active = insert_job(_job_payload("Active Co", "Backend Engineer", external_id="job-active"), review_status="new")
+    job_skipped = insert_job(_job_payload("Skipped Co", "Support Engineer", external_id="job-skipped", remote=False, description="Help desk and customer support"), review_status="new")
+    job_rejected = insert_job(_job_payload("Rejected Co", "QA Engineer", external_id="job-rejected"), review_status="new")
+
+    skip_resp = client.post(f"/jobs/{job_skipped}/skip?next=/jobs", follow_redirects=False)
+    assert skip_resp.status_code == 303
+
+    reject_resp = client.post(
+        f"/jobs/{job_rejected}/status/rejected?next=/jobs",
+        follow_redirects=False,
+    )
+    assert reject_resp.status_code == 303
+
+    default_page = client.get("/jobs")
+    assert default_page.status_code == 200
+    assert "Active Co" in default_page.text
+    assert "Skipped Co" not in default_page.text
+    assert "Rejected Co" not in default_page.text
+
+    skipped_page = client.get("/jobs", params={"status": "skipped"})
+    assert skipped_page.status_code == 200
+    assert "Skipped Co" in skipped_page.text
+    assert "Rejected Co" not in skipped_page.text
+
+    rejected_page = client.get("/jobs", params={"status": "rejected"})
+    assert rejected_page.status_code == 200
+    assert "Rejected Co" in rejected_page.text
+    assert "Skipped Co" not in rejected_page.text
 
 
 def test_job_detail_shows_breakdown_package_paths_and_open_apply(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

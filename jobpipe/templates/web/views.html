@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card stack">
+  <div class="actions">
+    <a class="button" href="/jobs">Jobs</a>
+    <a class="button" href="/kanban">Kanban</a>
+  </div>
+  <h2>Saved Views</h2>
+  <div class="muted">These are shortcuts to /jobs with filters already applied.</div>
+</section>
+
+<section class="view-grid">
+  {% for view in views %}
+  <article class="card stack">
+    <div class="actions">
+      <a class="button primary" href="{{ view.url }}">Open view</a>
+    </div>
+    <div>
+      <h3>{{ view.name }}</h3>
+      <div class="muted">{{ view.description }}</div>
+    </div>
+    <div class="meta-row">
+      {% for key, value in view.filters.items() %}
+      <span class="pill">{{ key }}={{ value }}</span>
+      {% endfor %}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}
