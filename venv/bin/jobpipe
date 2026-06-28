@@ -1,4 +1,4 @@
-#!/home/miles/Documents/job-pipe/venv/bin/python3
+#!/home/miles/Documents/job-pipe/venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

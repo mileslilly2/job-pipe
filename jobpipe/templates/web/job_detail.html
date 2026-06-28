@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card stack">
+  <div class="actions">
+    <a class="button" href="/jobs">Back to jobs</a>
+    <a class="button" href="/followups">Follow-ups</a>
+  </div>
+  <h2>{{ job.company }} - {{ job.title }}</h2>
+  <div class="muted">Job #{{ job.id }}</div>
+  <div class="actions">
+    <span class="pill">status: {{ job.review_status }}</span>
+    <span class="pill">provider: {{ job.provider }}</span>
+    <span class="pill">score: {{ job.score }}</span>
+  </div>
+  <div class="actions">
+    <form method="post" action="/jobs/{{ job.id }}/save?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="secondary" type="submit">Save</button>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/skip?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="danger" type="submit">Skip</button>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/package?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="secondary" type="submit">Package</button>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/apply-flow?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="primary" type="submit">Open apply URL</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card stack">
+    <h3>Metadata</h3>
+    <div><strong>Location:</strong> {{ job.location or "Unknown" }}</div>
+    <div><strong>Discovered at:</strong> {{ job.discovered_at or "Unknown" }}</div>
+    <div><strong>Posted at:</strong> {{ job.posted_at or "Unknown" }}</div>
+    <div><strong>Apply URL:</strong> {% if job.apply_url %}<a href="{{ job.apply_url }}">{{ job.apply_url }}</a>{% else %}None{% endif %}</div>
+    <div><strong>Source URL:</strong> {% if job.source_url %}<a href="{{ job.source_url }}">{{ job.source_url }}</a>{% else %}None{% endif %}</div>
+    <div><strong>Review status:</strong> {{ job.review_status }}</div>
+    <div><strong>Application status:</strong> {{ application.status if application else "None" }}</div>
+  </div>
+
+  <div class="card stack">
+    <h3>Scoring</h3>
+    {% if analysis %}
+    <div><strong>Role type:</strong> {{ analysis.role_type }}</div>
+    <div><strong>Seniority:</strong> {{ analysis.seniority_level }}</div>
+    <div><strong>Fit score:</strong> {{ analysis.fit_score }}</div>
+    <div><strong>Risk score:</strong> {{ analysis.risk_score }}</div>
+    <div><strong>Quality score:</strong> {{ analysis.quality_score }}</div>
+    <div><strong>Recommendation:</strong> {{ analysis.recommendation }}</div>
+    <div><strong>Skip reason:</strong> {{ analysis.skip_reason or "None" }}</div>
+    <div><strong>Matched keywords:</strong> {{ analysis.matched_keywords }}</div>
+    <div><strong>Missing keywords:</strong> {{ analysis.missing_keywords }}</div>
+    <div><strong>Red flags:</strong> {{ analysis.red_flags }}</div>
+    <div><strong>Eligibility flags:</strong> {{ analysis.eligibility_flags }}</div>
+    <div><strong>Analysis notes:</strong></div>
+    <pre>{{ analysis.notes or "None" }}</pre>
+    {% else %}
+    <div class="muted">Run analysis to populate the fit breakdown.</div>
+    {% endif %}
+    <div><strong>Current fit score:</strong> {{ job.score }}</div>
+    <div><strong>Learned adjustments:</strong></div>
+    {% if learned_adjustments %}
+      <ul class="compact">
+      {% for note in learned_adjustments %}
+        <li>{{ note }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">No learned adjustments applied.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card stack">
+  <h3>Description</h3>
+  <pre>{{ job.description or job.raw_text or "No description stored." }}</pre>
+</section>
+
+<section class="card stack">
+  <h3>Generated artifacts</h3>
+  {% if packet %}
+    <div><strong>Packet path:</strong> {{ packet.packet_path or "None" }}</div>
+    <div><strong>Resume path:</strong> {{ packet.resume_path or "None" }}</div>
+    <div><strong>Answers path:</strong> {{ packet.answers_path or "None" }}</div>
+    <div><strong>Cover note path:</strong> {{ packet.cover_note_path or "None" }}</div>
+  {% endif %}
+  {% if package_paths %}
+    <ul class="compact">
+    {% for label, path in package_paths.items() %}
+      <li><strong>{{ label }}:</strong> {{ path }}</li>
+    {% endfor %}
+    </ul>
+  {% else %}
+    <div class="muted">No application package files detected yet.</div>
+  {% endif %}
+</section>
+{% endblock %}

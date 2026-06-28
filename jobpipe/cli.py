@@ -741,6 +741,14 @@ def open_command(job_id: int) -> None:
     console.print("Opened browser." if opened else "Browser open request failed.")
 
 
+@app.command("web")
+def web(no_open: bool = typer.Option(False, "--no-open", help="Start the dashboard without opening a browser.")) -> None:
+    _ensure_workspace()
+    from .web import run_web_server
+
+    run_web_server(open_browser=not no_open)
+
+
 @app.command("export")
 def export_command() -> None:
     _ensure_workspace()

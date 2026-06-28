@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or "JobPipe Dashboard" }}</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f4ee;
+        --panel: #fffaf2;
+        --panel-alt: #f2efe8;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --accent: #1f6feb;
+        --accent-strong: #1147a0;
+        --border: #d7d0c5;
+        --success: #157f3b;
+        --warn: #a16207;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background: linear-gradient(180deg, #f8f5ef 0%, #f1ece1 100%);
+        color: var(--text);
+      }
+      header, main { width: min(1200px, calc(100vw - 2rem)); margin: 0 auto; }
+      header {
+        padding: 2rem 0 1rem;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
+      nav a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      h1, h2, h3 { margin: 0 0 0.75rem; line-height: 1.1; }
+      .muted { color: var(--muted); }
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+      .grid.cards { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+      .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+      .card {
+        background: rgba(255, 250, 242, 0.88);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1rem;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+      }
+      .stat {
+        font-size: 2rem;
+        font-weight: 700;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .actions form { display: inline; margin: 0; }
+      .button, button, .button-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.2rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: white;
+        color: var(--text);
+        text-decoration: none;
+        font: inherit;
+        cursor: pointer;
+      }
+      .button.primary, button.primary {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      .button.secondary, button.secondary { background: var(--panel-alt); }
+      .button.danger, button.danger { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(255, 250, 242, 0.96);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      th, td {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: rgba(242, 239, 232, 0.9);
+        font-size: 0.9rem;
+        color: #374151;
+      }
+      tr:last-child td { border-bottom: none; }
+      .pill {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.82rem;
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+      }
+      .pill.good { color: var(--success); }
+      .pill.warn { color: var(--warn); }
+      .stack > * + * { margin-top: 0.5rem; }
+      .filters {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-bottom: 1rem;
+      }
+      label { display: grid; gap: 0.35rem; font-weight: 700; }
+      input[type="text"], input[type="number"], select {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.55rem 0.7rem;
+        font: inherit;
+        background: white;
+      }
+      .checkbox {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        font-weight: 700;
+        padding-top: 1.6rem;
+      }
+      ul.compact {
+        margin: 0.25rem 0 0;
+        padding-left: 1.1rem;
+      }
+      code, pre {
+        background: #f3efe6;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      pre {
+        padding: 0.9rem;
+        overflow-x: auto;
+        white-space: pre-wrap;
+      }
+      .table-wrap { overflow-x: auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>JobPipe Dashboard</h1>
+      <div class="muted">A local control panel for saved, reviewed, and packaged jobs.</div>
+      <nav>
+        <a href="/">Summary</a>
+        <a href="/jobs">Jobs</a>
+        <a href="/followups">Follow-ups</a>
+      </nav>
+    </header>
+    <main class="grid" style="padding-bottom: 2rem;">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

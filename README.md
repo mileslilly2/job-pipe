@@ -1,6 +1,6 @@
 # jobpipe
 
-`jobpipe` is a local-first CLI for repetitive job application prep. It stores job postings, ranks them with a deterministic fit score, and lets you review, save, package, or skip jobs without a web UI.
+`jobpipe` is a local-first CLI for repetitive job application prep. It stores job postings, ranks them with a deterministic fit score, and lets you review, save, package, or skip jobs. A thin local web dashboard is available for the same underlying workflow.
 
 ## Requirements
 
@@ -121,8 +121,8 @@ jobpipe export
 2. Use `jobpipe sources list` to inspect the current source set, then add, enable, or disable entries as needed.
 3. Edit `data/job_sources.yaml` directly when you want to tune `target_role_families` or keyword overrides.
 4. Run `jobpipe ingest` to fetch jobs and score them locally.
-4. Run `jobpipe review` for quick single-job triage, or `jobpipe batch-review` to process the ranked queue in one session.
-5. Use the interactive actions in `batch-review`:
+5. Run `jobpipe review` for quick single-job triage, or `jobpipe batch-review` to process the ranked queue in one session.
+6. Use the interactive actions in `batch-review`:
    - `s` save only
    - `p` save + package
    - `a` save + package + apply-flow
@@ -130,11 +130,17 @@ jobpipe export
    - `d` details
    - `o` open URL
    - `q` quit
-6. After choosing `s`, `p`, `a`, or `k`, you will be prompted for an optional **reason code** (e.g. `too_senior`, `strong_python`) and an optional **note**. These help the deterministic learner adjust your fit scores.
-7. Use `jobpipe show <job-id>` for a full local detail view, including a breakdown of learned adjustments.
-8. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
-9. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually.
-10. Use `jobpipe feedback-report` to see how the tool is adjusting your scores.
+7. After choosing `s`, `p`, `a`, or `k`, you will be prompted for an optional **reason code** (e.g. `too_senior`, `strong_python`) and an optional **note**. These help the deterministic learner adjust your fit scores.
+8. Use `jobpipe show <job-id>` for a full local detail view, including a breakdown of learned adjustments.
+9. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
+10. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually.
+11. Use `jobpipe feedback-report` to see how the tool is adjusting your scores.
+
+## Web UI
+
+- `jobpipe web` starts a local-only FastAPI server on `127.0.0.1:8765`.
+- The browser opens automatically unless `--no-open` is passed.
+- The UI stays read-only except for the existing save, skip, package, and open-apply actions.
 
 ## Commands
 
@@ -158,6 +164,7 @@ jobpipe export
 - `jobpipe edit JOB_ID [--title ...] [--company ...] [--location ...]`
 - `jobpipe due [--limit INT]`
 - `jobpipe open JOB_ID`
+- `jobpipe web [--no-open]`
 - `jobpipe export`
 - `jobpipe feedback JOB_ID ACTION [--reason ...] [--note ...]`
 - `jobpipe feedback-report`

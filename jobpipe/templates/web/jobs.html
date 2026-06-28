@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Jobs</h2>
+  <form method="get" class="filters">
+    <label>
+      Status
+      <select name="status">
+        <option value="">All</option>
+        {% for value in ["new", "saved", "skipped", "applied"] %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Provider
+      <input type="text" name="provider" value="{{ filters.provider }}" placeholder="greenhouse">
+    </label>
+    <label>
+      Company
+      <input type="text" name="company" value="{{ filters.company }}" placeholder="Stripe">
+    </label>
+    <label>
+      Min score
+      <input type="number" name="min_score" min="0" max="100" value="{{ filters.min_score }}">
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="remote_only" value="true" {% if filters.remote_only %}checked{% endif %}>
+      Remote only
+    </label>
+    <label>
+      Search text
+      <input type="text" name="q" value="{{ filters.q }}" placeholder="python automation">
+    </label>
+    <div class="actions" style="align-items:end;">
+      <button class="primary" type="submit">Apply filters</button>
+      <a class="button" href="/jobs">Reset</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="muted">{{ jobs|length }} job(s) shown.</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Provider</th>
+          <th>Discovered</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for job in jobs %}
+        <tr>
+          <td>{{ job.score }}</td>
+          <td>{{ job.company }}</td>
+          <td>{{ job.title }}</td>
+          <td>{{ job.location }}</td>
+          <td><span class="pill">{{ job.display_status }}</span>{% if job.has_package %} <span class="pill good">packaged</span>{% endif %}</td>
+          <td>{{ job.provider }}</td>
+          <td>{{ job.discovered_at }}</td>
+          <td>
+            <div class="actions">
+              <a class="button" href="/jobs/{{ job.id }}">Show details</a>
+              <form method="post" action="/jobs/{{ job.id }}/save?next={{ '/jobs' | urlencode }}">
+                <button class="secondary" type="submit">Save</button>
+              </form>
+              <form method="post" action="/jobs/{{ job.id }}/skip?next={{ '/jobs' | urlencode }}">
+                <button class="danger" type="submit">Skip</button>
+              </form>
+              <form method="post" action="/jobs/{{ job.id }}/package?next={{ '/jobs' | urlencode }}">
+                <button class="secondary" type="submit">Package</button>
+              </form>
+              <form method="post" action="/jobs/{{ job.id }}/apply-flow?next={{ '/jobs' | urlencode }}">
+                <button class="primary" type="submit">Open apply URL</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
