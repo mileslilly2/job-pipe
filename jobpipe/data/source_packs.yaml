@@ -1,0 +1,281 @@
+data_engineering:
+  - provider: greenhouse
+    company: Stripe
+    company_slug: stripe
+    board_token: stripe
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - python_automation
+    enabled: true
+  - provider: greenhouse
+    company: Coinbase
+    company_slug: coinbase
+    board_token: coinbase
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Datadog
+    company_slug: datadog
+    board_token: datadog
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - technical_operations
+    enabled: true
+  - provider: greenhouse
+    company: GitLab
+    company_slug: gitlab
+    board_token: gitlab
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - technical_operations
+    enabled: true
+  - provider: greenhouse
+    company: Figma
+    company_slug: figma
+    board_token: figma
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - software_engineer
+    enabled: true
+
+python_backend:
+  - provider: greenhouse
+    company: GitLab
+    company_slug: gitlab
+    board_token: gitlab
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - python_automation
+    enabled: true
+  - provider: greenhouse
+    company: Stripe
+    company_slug: stripe
+    board_token: stripe
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - data_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Postman
+    company_slug: postman
+    board_token: postman
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - qa_automation
+    enabled: true
+  - provider: greenhouse
+    company: Linear
+    company_slug: linear
+    board_token: linear
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - junior_software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Notion
+    company_slug: notion
+    board_token: notion
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - python_automation
+    enabled: true
+
+developer_tools:
+  - provider: greenhouse
+    company: GitLab
+    company_slug: gitlab
+    board_token: gitlab
+    target_role_families:
+      - technical_operations
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Postman
+    company_slug: postman
+    board_token: postman
+    target_role_families:
+      - backend_api
+      - qa_automation
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Figma
+    company_slug: figma
+    board_token: figma
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - data_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Datadog
+    company_slug: datadog
+    board_token: datadog
+    target_role_families:
+      - technical_operations
+      - backend_api
+      - data_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Vercel
+    company_slug: vercel
+    board_token: vercel
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - technical_operations
+    enabled: true
+
+ai_eval:
+  - provider: lever
+    company: Mistral AI
+    company_slug: mistral
+    account: mistral
+    target_role_families:
+      - ai_evaluation
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: OpenAI
+    company_slug: openai
+    board_token: openai
+    target_role_families:
+      - ai_evaluation
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Anthropic
+    company_slug: anthropic
+    board_token: anthropic
+    target_role_families:
+      - ai_evaluation
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Scale AI
+    company_slug: scaleai
+    board_token: scaleai
+    target_role_families:
+      - ai_evaluation
+      - data_engineer
+      - backend_api
+    enabled: true
+  - provider: greenhouse
+    company: Hugging Face
+    company_slug: huggingface
+    board_token: huggingface
+    target_role_families:
+      - ai_evaluation
+      - backend_api
+      - software_engineer
+    enabled: true
+
+remote_friendly:
+  - provider: greenhouse
+    company: GitLab
+    company_slug: gitlab
+    board_token: gitlab
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - technical_operations
+    enabled: true
+  - provider: lever
+    company: Wellfound
+    company_slug: angellist
+    account: angellist
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: lever
+    company: Mistral AI
+    company_slug: mistral
+    account: mistral
+    target_role_families:
+      - ai_evaluation
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: greenhouse
+    company: PostHog
+    company_slug: posthog
+    board_token: posthog
+    target_role_families:
+      - data_engineer
+      - backend_api
+      - software_engineer
+    enabled: true
+  - provider: greenhouse
+    company: Vercel
+    company_slug: vercel
+    board_token: vercel
+    target_role_families:
+      - backend_api
+      - software_engineer
+      - technical_operations
+    enabled: true
+
+startups:
+  - provider: lever
+    company: Wellfound
+    company_slug: angellist
+    account: angellist
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: greenhouse
+    company: Linear
+    company_slug: linear
+    board_token: linear
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: greenhouse
+    company: Notion
+    company_slug: notion
+    board_token: notion
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: greenhouse
+    company: PostHog
+    company_slug: posthog
+    board_token: posthog
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - backend_api
+    enabled: true
+  - provider: lever
+    company: Mistral AI
+    company_slug: mistral
+    account: mistral
+    target_role_families:
+      - junior_software_engineer
+      - software_engineer
+      - ai_evaluation
+    enabled: true

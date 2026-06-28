@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .catalog import load_search_profile
 from .db import get_analysis, get_job
 from .score import RESUME_KEYWORDS, score_job_fit_v1
 from .utils import ensure_dir, load_json, normalize_text, root_dir, slugify
@@ -179,7 +180,7 @@ def _fit_context(job: dict[str, Any], analysis_row) -> tuple[int, list[str], lis
             job.get("raw_text"),
         )
     ).lower()
-    computed_score, notes = score_job_fit_v1(job)
+    computed_score, notes = score_job_fit_v1(job, profile=load_search_profile())
     fit_score = computed_score
     matched_keywords = [keyword for keyword in RESUME_KEYWORDS if _phrase_in_text(text, keyword)]
     missing_keywords = [keyword for keyword in RESUME_KEYWORDS if keyword not in matched_keywords]

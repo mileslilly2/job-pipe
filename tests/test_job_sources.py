@@ -1,9 +1,10 @@
 from pathlib import Path
 
+from jobpipe.catalog import load_search_profile
 from jobpipe.cli import app
 from jobpipe.db import get_job_by_provider_external_id, init_database
-from jobpipe.ingest import load_job_sources, resolve_job_sources
-from jobpipe.models import DiscoveredJob
+from jobpipe.ingest import filter_discovered_jobs, load_job_sources, resolve_job_sources
+from jobpipe.models import DiscoveredJob, JobSource
 
 
 def _set_packaged_sources(monkeypatch, tmp_path: Path, content: str) -> Path:
@@ -255,7 +256,16 @@ def test_ingest_uses_configured_company_slugs_and_filters_low_fit_roles(initiali
     result = runner.invoke(app, ["ingest"])
     assert result.exit_code == 0, result.stdout
     assert "Using configured job sources from data/job_sources.yaml." in result.stdout
+    assert "Using active search profile miles." in result.stdout
+    assert "Fetched 5 job(s)." in result.stdout
     assert "Filtered out 3 job(s)." in result.stdout
+    assert "Inserted 2 new job(s)." in result.stdout
+    assert "Updated 0" in result.stdout
+
+    repeat = runner.invoke(app, ["ingest"])
+    assert repeat.exit_code == 0, repeat.stdout
+    assert "Inserted 0 new job(s)." in repeat.stdout
+    assert "Updated 2" in repeat.stdout
 
     assert get_job_by_provider_external_id("greenhouse", "gh-good") is not None
     assert get_job_by_provider_external_id("lever", "lv-good") is not None
@@ -390,3 +400,92 @@ def test_sources_test_uses_active_sources_and_allows_targeting_disabled_sources(
     assert disabled_result.exit_code == 0, disabled_result.stdout
     assert calls == [("lever", "beta")]
     assert "Testing lever:beta (disabled)" in disabled_result.stdout
+
+
+
+def test_search_profile_miles_loaded_from_packaged_data() -> None:
+    profile = load_search_profile("miles", Path("jobpipe/data/search_profiles.yaml"))
+    assert profile.name == "miles"
+    assert "data_engineer" in profile.target_role_families
+    assert "remote" in profile.preferred_work_styles
+    assert "hybrid" in profile.preferred_work_styles
+    assert "senior" in profile.excluded_levels
+    assert "python" in profile.positive_keywords
+
+
+def test_sources_import_pack_is_idempotent(initialized_workspace, runner, monkeypatch) -> None:
+    monkeypatch.setattr("jobpipe.cli._ensure_workspace", lambda: init_database())
+    Path("data/job_sources.yaml").write_text("[]\n", encoding="utf-8")
+
+    first = runner.invoke(app, ["sources", "import-pack", "data_engineering"])
+    assert first.exit_code == 0, first.stdout
+    assert "5 added" in first.stdout
+    assert "0 skipped" in first.stdout
+
+    second = runner.invoke(app, ["sources", "import-pack", "data_engineering"])
+    assert second.exit_code == 0, second.stdout
+    assert "0 added" in second.stdout
+    assert "5 skipped" in second.stdout
+    content = Path("data/job_sources.yaml").read_text(encoding="utf-8")
+    assert content.count("company: Stripe") == 1
+
+
+def test_sources_add_rejects_duplicate_source_identity(initialized_workspace, runner) -> None:
+    args = [
+        "sources",
+        "add",
+        "--provider",
+        "greenhouse",
+        "--company",
+        "Duplicate Co",
+        "--company-slug",
+        "duplicate-co",
+        "--board-token",
+        "duplicate-co",
+    ]
+    first = runner.invoke(app, args)
+    assert first.exit_code == 0, first.stdout
+    second = runner.invoke(app, args)
+    assert second.exit_code != 0
+    content = Path("data/job_sources.yaml").read_text(encoding="utf-8")
+    assert content.count("company: Duplicate Co") == 1
+
+
+def test_profile_aware_filtering_excludes_excluded_levels() -> None:
+    source = JobSource(
+        provider="greenhouse",
+        company="Acme",
+        company_slug="acme",
+        board_token="acme",
+        target_role_families=["data_engineer"],
+        enabled=True,
+    )
+    profile = load_search_profile()
+    jobs = [
+        DiscoveredJob(
+            provider="greenhouse",
+            external_id="good",
+            company="Acme",
+            title="Junior Data Engineer",
+            location="Remote",
+            remote=True,
+            apply_url="https://example.com/good",
+            description="Python SQL ETL backend API",
+            posted_at="2026-06-22T00:00:00+00:00",
+        ),
+        DiscoveredJob(
+            provider="greenhouse",
+            external_id="bad",
+            company="Acme",
+            title="Senior Data Engineer",
+            location="Remote",
+            remote=True,
+            apply_url="https://example.com/bad",
+            description="Python SQL ETL backend API",
+            posted_at="2026-06-22T00:00:00+00:00",
+        ),
+    ]
+
+    filtered = filter_discovered_jobs(jobs, source, profile)
+
+    assert [job.external_id for job in filtered] == ["good"]

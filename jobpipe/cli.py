@@ -10,6 +10,7 @@ from rich.table import Table
 
 from .browser import open_url
 from .application_package import application_package_paths, build_application_package
+from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, source_identity, source_identity_label
 from .classify import classify_job, detect_seniority
 from .db import (
     get_analysis,
@@ -42,6 +43,7 @@ from .tracker import ALLOWED_STATUSES, due_followups, update_status
 from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, package_dir, root_dir, slugify
 
 app = typer.Typer(help="Application cockpit for repetitive job applications.")
+profiles_app = typer.Typer(help="Manage search profiles.")
 sources_app = typer.Typer(help="Manage configured job sources.")
 console = Console()
 
@@ -52,6 +54,10 @@ def _env() -> Environment:
 
 def _load_candidate() -> CandidateProfile:
     return CandidateProfile.model_validate(load_yaml(data_dir() / "profiles" / "candidate.yaml"))
+
+
+def _load_active_profile():
+    return load_search_profile()
 
 
 def _load_role_packs() -> dict[str, RolePack]:
@@ -67,6 +73,8 @@ def _package_assets() -> list[tuple[Path, Path]]:
         (pkg / "profile.md", root_dir() / "profile.md"),
         (pkg / "data" / "profiles" / "candidate.yaml", root_dir() / "data" / "profiles" / "candidate.yaml"),
         (pkg / "data" / "job_sources.yaml", root_dir() / "data" / "job_sources.yaml"),
+        (pkg / "data" / "search_profiles.yaml", root_dir() / "data" / "search_profiles.yaml"),
+        (pkg / "data" / "source_packs.yaml", root_dir() / "data" / "source_packs.yaml"),
         (pkg / "role_packs" / "helpdesk.yaml", root_dir() / "role_packs" / "helpdesk.yaml"),
         (pkg / "role_packs" / "technical_support.yaml", root_dir() / "role_packs" / "technical_support.yaml"),
         (pkg / "role_packs" / "junior_dev.yaml", root_dir() / "role_packs" / "junior_dev.yaml"),
@@ -114,7 +122,7 @@ def _load_job_sources_records(path: Path) -> list[JobSource]:
         return []
     if not isinstance(raw, list):
         raise ValueError("job source config must be a YAML list")
-    return [JobSource.model_validate(item) for item in raw]
+    return [normalize_job_source(JobSource.model_validate(item)) for item in raw]
 
 
 def _write_job_sources_records(path: Path, sources: list[JobSource]) -> None:
@@ -124,25 +132,7 @@ def _write_job_sources_records(path: Path, sources: list[JobSource]) -> None:
 
 
 def _normalize_saved_job_source(source: JobSource) -> JobSource:
-    provider = (source.provider or "").strip().lower()
-    company = (source.company or "").strip()
-    company_slug = (source.company_slug or "").strip() or slugify(company or source.board_token or source.account or provider)
-    board_token = (source.board_token or "").strip() or None
-    account = (source.account or "").strip() or None
-    target_role_families = [value.strip() for value in source.target_role_families if value and value.strip()]
-    include_keywords = [value.strip() for value in source.include_keywords if value and value.strip()]
-    exclude_keywords = [value.strip() for value in source.exclude_keywords if value and value.strip()]
-    return JobSource(
-        provider=provider,
-        company=company,
-        company_slug=company_slug,
-        board_token=board_token,
-        account=account,
-        target_role_families=target_role_families,
-        include_keywords=include_keywords,
-        exclude_keywords=exclude_keywords,
-        enabled=source.enabled,
-    )
+    return normalize_job_source(source)
 
 
 def _source_matches_identifier(source: JobSource, identifier: str) -> bool:
@@ -156,6 +146,7 @@ def _source_matches_identifier(source: JobSource, identifier: str) -> bool:
         source.account or "",
         f"{source.provider}:{source.company_slug}",
         f"{source.provider}:{source.company}",
+        source_identity_label(source),
     ]
     return any(candidate.strip().lower() == value for candidate in candidates if candidate)
 
@@ -171,20 +162,29 @@ def _active_source_state(source: JobSource) -> str:
     return "active" if source.enabled else "disabled"
 
 
+def _source_identity_key(source: JobSource) -> tuple[str, str]:
+    provider = (source.provider or "").strip().lower()
+    company_slug = (source.company_slug or "").strip().lower()
+    if not company_slug:
+        company_slug = slugify(source.company or source.board_token or source.account or provider)
+    return provider, company_slug
+
+
 def _render_template(template_name: str, context: dict) -> str:
     return _env().get_template(template_name).render(**context)
 
 
-def _score_notes(job_row) -> tuple[int, list[str]]:
+def _score_notes(job_row, profile=None) -> tuple[int, list[str]]:
     learned_weights = load_learned_weights()
-    score, notes = score_job_fit_v1(dict(job_row), learned_weights=learned_weights)
+    active_profile = profile or _load_active_profile()
+    score, notes = score_job_fit_v1(dict(job_row), learned_weights=learned_weights, profile=active_profile)
     return score, notes
 
 
-def _print_job_details(job_row) -> None:
+def _print_job_details(job_row, profile=None) -> None:
     job = dict(job_row)
     app_row = get_application(job["id"])
-    score, notes = _score_notes(job_row)
+    score, notes = _score_notes(job_row, profile)
     table = Table(title=f"Job {job['id']}", show_header=False)
     table.add_column("Field")
     table.add_column("Value")
@@ -215,8 +215,8 @@ def _print_job_details(job_row) -> None:
             console.print(f"- {note}")
 
 
-def _print_queue_job(row) -> None:
-    score, _notes = _score_notes(row)
+def _print_queue_job(row, profile=None) -> None:
+    score, _notes = _score_notes(row, profile)
     console.rule(f"{row['company']} - {row['title']}")
     console.print(f"Location: {row['location'] or 'Unknown'}")
     console.print(f"Fit score: {score}")
@@ -267,7 +267,7 @@ def _apply_flow_session(job_id: int, reason: str | None = None, note: str | None
 def _batch_review_job(job_row) -> None:
     job = dict(job_row)
     while True:
-        _print_queue_job(job_row)
+        _print_queue_job(job_row, _load_active_profile())
         choice = input("[s] save only  [p] save + package  [a] save + package + apply-flow  [k] skip  [d] details  [o] open URL  [q] quit: ").strip().lower()
         job_id = int(job["id"])
 
@@ -312,7 +312,7 @@ def _batch_review_job(job_row) -> None:
                 return
 
         if choice == "d":
-            _print_job_details(get_job(job_id))
+            _print_job_details(get_job(job_id), _load_active_profile())
             continue
         if choice == "o":
             opened = open_url(str(job.get("apply_url") or job.get("source_url") or ""))
@@ -352,6 +352,7 @@ def add_url(url: str) -> None:
 @app.command("ingest")
 def ingest() -> None:
     _ensure_workspace()
+    active_profile = _load_active_profile()
     source_config = resolve_job_sources(data_dir() / "job_sources.yaml")
     sources = source_config.sources
     if not sources:
@@ -361,28 +362,31 @@ def ingest() -> None:
         console.print("Using built-in starter job sources because data/job_sources.yaml is missing or empty.")
     else:
         console.print("Using configured job sources from data/job_sources.yaml.")
-    ingested = 0
+    console.print(f"Using active search profile {active_profile.name}.")
+    fetched = 0
+    inserted = 0
     updated = 0
     filtered_out = 0
     for source in sources:
         try:
             discovered = discover_provider_jobs(source)
+            fetched += len(discovered)
         except Exception as exc:  # pragma: no cover - defensive CLI guard
             console.print(f"[red]Failed to ingest {source.provider}:{source.company or source.company_slug or source.board_token or source.account}[/red] {exc}")
             continue
-        filtered = filter_discovered_jobs(discovered, source)
+        filtered = filter_discovered_jobs(discovered, source, active_profile)
         filtered_out += max(len(discovered) - len(filtered), 0)
         for job in filtered:
             payload = job.model_dump()
-            payload["fit_score"], _notes = score_job_fit_v1(payload)
+            payload["fit_score"], _notes = score_job_fit_v1(payload, profile=active_profile)
             payload["status"] = "new"
             existing = get_job_by_provider_external_id(job.provider, job.external_id)
             insert_job(payload, review_status="new")
             if existing is None:
-                ingested += 1
+                inserted += 1
             else:
                 updated += 1
-    console.print(f"Ingested {ingested} new job(s). Updated {updated} existing job(s). Filtered out {filtered_out} job(s).")
+    console.print(f"Fetched {fetched} job(s). Filtered out {filtered_out} job(s). Inserted {inserted} new job(s). Updated {updated} existing job(s).")
 
 
 @app.command("list")
@@ -391,8 +395,9 @@ def list_command() -> None:
     table = Table(title="Jobs")
     for column in ["ID", "Title", "Company", "Role", "Seniority", "Fit", "Risk", "Quality", "Rec", "Reason", "Status", "Due"]:
         table.add_column(column)
+    active_profile = _load_active_profile()
     for row in rows:
-        score, _notes = _score_notes(row)
+        score, _notes = _score_notes(row, active_profile)
         table.add_row(
             str(row["id"]),
             row["title"] or "",
@@ -423,7 +428,8 @@ def analyze(job_id: int) -> None:
     pack = packs.get(role_type)
     risk_score, red_flags = score_risk(job, pack)
     seniority, eligibility_flags = detect_seniority(job, risk_score=risk_score, risk_flags=red_flags)
-    display_fit_score, display_fit_notes = score_job_fit_v1(job)
+    active_profile = _load_active_profile()
+    display_fit_score, display_fit_notes = score_job_fit_v1(job, profile=active_profile)
     fit_score, fit_notes = score_fit(job, role_type, seniority, pack, candidate, matched_keywords)
     quality_score, quality_notes = score_quality(job, role_type, seniority)
     recommendation, skip_reason = make_recommendation(fit_score, risk_score, quality_score, role_type, seniority, red_flags)
@@ -473,7 +479,7 @@ def show(job_id: int) -> None:
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
-    _print_job_details(row)
+    _print_job_details(row, _load_active_profile())
 
 
 @app.command("packet")
@@ -567,7 +573,7 @@ def review() -> None:
                 index += 1
                 continue
         if choice == "d":
-            _print_job_details(get_job(int(row["id"])))
+            _print_job_details(get_job(int(row["id"])), _load_active_profile())
             continue
         if choice == "o":
             opened = open_url(str(row["apply_url"] or ""))
@@ -742,6 +748,54 @@ def export_command() -> None:
     console.print(f"Exported tracker CSV to {path}")
 
 
+@profiles_app.command("list")
+def profiles_list() -> None:
+    _ensure_workspace()
+    loaded = load_search_profiles()
+    if not loaded.profiles:
+        console.print("No search profiles configured.")
+        return
+
+    table = Table(title="Search Profiles")
+    for column in ["Name", "Target Families", "Positive Keywords", "Negative Keywords", "Work Styles", "Preferred Levels", "Excluded Levels"]:
+        table.add_column(column)
+    for profile in loaded.profiles.values():
+        table.add_row(
+            profile.name,
+            ", ".join(profile.target_role_families),
+            ", ".join(profile.positive_keywords),
+            ", ".join(profile.negative_keywords),
+            ", ".join(profile.preferred_work_styles),
+            ", ".join(profile.preferred_role_levels),
+            ", ".join(profile.excluded_levels),
+        )
+    console.print(table)
+
+
+@profiles_app.command("show")
+def profiles_show(profile_name: str) -> None:
+    _ensure_workspace()
+    try:
+        profile = load_search_profile(profile_name)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    table = Table(title=f"Search Profile: {profile.name}", show_header=False)
+    table.add_column("Field")
+    table.add_column("Value")
+    rows = [
+        ("Name", profile.name),
+        ("Target Role Families", ", ".join(profile.target_role_families)),
+        ("Positive Keywords", ", ".join(profile.positive_keywords)),
+        ("Negative Keywords", ", ".join(profile.negative_keywords)),
+        ("Preferred Work Styles", ", ".join(profile.preferred_work_styles)),
+        ("Preferred Role Levels", ", ".join(profile.preferred_role_levels)),
+        ("Excluded Levels", ", ".join(profile.excluded_levels)),
+    ]
+    for field, value in rows:
+        table.add_row(field, value)
+    console.print(table)
+
+
 @sources_app.command("list")
 def sources_list() -> None:
     _ensure_workspace()
@@ -801,7 +855,7 @@ def sources_add(
             enabled=not disabled,
         )
     )
-    if any(existing.company_slug == pending.company_slug for existing in sources):
+    if any(_source_identity_key(existing) == _source_identity_key(pending) for existing in sources):
         raise typer.BadParameter(f"Source {pending.company_slug!r} already exists.")
     sources.append(pending)
     _write_job_sources_records(_job_sources_path(), sources)
@@ -830,6 +884,48 @@ def sources_disable(source_id: str) -> None:
     console.print(f"Disabled source {sources[index].company_slug}.")
 
 
+@sources_app.command("packs")
+def sources_packs() -> None:
+    _ensure_workspace()
+    loaded = load_source_packs()
+    if not loaded.packs:
+        console.print("No source packs configured.")
+        return
+
+    table = Table(title="Source Packs")
+    for column in ["Category", "Sources", "Companies"]:
+        table.add_column(column)
+    for category, sources in loaded.packs.items():
+        table.add_row(
+            category,
+            str(len(sources)),
+            ", ".join(source.company for source in sources),
+        )
+    console.print(table)
+
+
+@sources_app.command("import-pack")
+def sources_import_pack(category: str) -> None:
+    _ensure_workspace()
+    path = _job_sources_path()
+    sources = _load_job_sources_records(path)
+    try:
+        pack = load_source_pack(category)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    imported = 0
+    skipped = 0
+    for source in pack:
+        normalized = _normalize_saved_job_source(source)
+        if any(_source_identity_key(existing) == _source_identity_key(normalized) for existing in sources):
+            skipped += 1
+            continue
+        sources.append(normalized)
+        imported += 1
+    _write_job_sources_records(path, sources)
+    console.print(f"Imported source pack {category}: {imported} added, {skipped} skipped.")
+
+
 @sources_app.command("test")
 def sources_test(source_id: str | None = typer.Argument(None, help="Optional company slug, company name, or provider token.")) -> None:
     _ensure_workspace()
@@ -849,7 +945,7 @@ def sources_test(source_id: str | None = typer.Argument(None, help="Optional com
 
     failures = 0
     for source in selected:
-        label = f"{source.provider}:{source.company_slug or source.company or source.board_token or source.account}"
+        label = source_identity_label(source)
         console.print(f"Testing {label} ({_active_source_state(source)})")
         try:
             discovered = discover_provider_jobs(source)
@@ -863,6 +959,7 @@ def sources_test(source_id: str | None = typer.Argument(None, help="Optional com
         raise typer.Exit(code=1)
 
 
+app.add_typer(profiles_app, name="profiles")
 app.add_typer(sources_app, name="sources")
 
 

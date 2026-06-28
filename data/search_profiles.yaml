@@ -1,0 +1,60 @@
+- name: miles
+  target_role_families:
+    - junior_software_engineer
+    - software_engineer
+    - backend_api
+    - data_engineer
+    - python_automation
+    - qa_automation
+    - ai_evaluation
+    - technical_operations
+  positive_keywords:
+    - python
+    - sql
+    - etl
+    - backend
+    - api
+    - automation
+    - workflow automation
+    - data engineering
+    - data pipeline
+    - playwright
+    - pytest
+    - jinja
+    - sqlite
+    - cli
+    - remote
+  negative_keywords:
+    - help desk
+    - helpdesk
+    - service desk
+    - customer support
+    - customer success
+    - sales
+    - sdr
+    - bdr
+    - manager
+    - director
+    - principal
+    - staff
+    - lead
+    - architect
+    - clinical
+    - nurse
+    - medical
+    - admin
+  preferred_work_styles:
+    - remote
+    - hybrid
+  preferred_role_levels:
+    - junior
+    - entry
+    - mid
+    - apprenticeship
+    - contractor
+  excluded_levels:
+    - senior
+    - staff
+    - principal
+    - manager
+    - director

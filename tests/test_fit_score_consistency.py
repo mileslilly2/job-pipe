@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from jobpipe.catalog import load_search_profile
 from jobpipe.cli import app
 from jobpipe.db import get_analysis, get_job, insert_job, list_review_jobs
 from jobpipe.score import score_job_fit_v1
@@ -45,8 +46,9 @@ def test_fit_score_is_consistent_across_queue_list_details_and_analyze(initializ
     assert high_job is not None
     assert low_job is not None
 
-    expected_high_score, expected_high_notes = score_job_fit_v1(dict(high_job))
-    expected_low_score, _ = score_job_fit_v1(dict(low_job))
+    profile = load_search_profile()
+    expected_high_score, expected_high_notes = score_job_fit_v1(dict(high_job), profile=profile)
+    expected_low_score, _ = score_job_fit_v1(dict(low_job), profile=profile)
     assert expected_high_score > expected_low_score
     assert high_job["fit_score"] == 12
     assert low_job["fit_score"] == 88

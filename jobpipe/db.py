@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .catalog import load_search_profile
 from .score import score_job_fit_v1
 from .utils import db_path, dump_json, ensure_dir, now_iso
 
@@ -439,6 +440,7 @@ def list_feedback_with_analysis() -> list[sqlite3.Row]:
 def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
     from .learn import load_learned_weights
     learned_weights = load_learned_weights()
+    active_profile = load_search_profile()
     rows = fetch_all(
         """
         SELECT
@@ -451,7 +453,7 @@ def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
     ranked = sorted(
         rows,
         key=lambda row: (
-            -score_job_fit_v1(dict(row), learned_weights=learned_weights)[0],
+            -score_job_fit_v1(dict(row), learned_weights=learned_weights, profile=active_profile)[0],
             str(row["discovered_at"] or ""),
             int(row["id"]),
         ),

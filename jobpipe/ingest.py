@@ -6,7 +6,9 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from .models import DiscoveredJob, JobSource, ParsedJob
+from .catalog import load_search_profile, normalize_job_source
+from .classify import detect_seniority
+from .models import DiscoveredJob, JobSource, ParsedJob, SearchProfile
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .score import classify_role_family
@@ -120,7 +122,7 @@ def load_job_sources(path: Path) -> list[JobSource]:
         source = JobSource.model_validate(item)
         if not source.enabled:
             continue
-        sources.append(_normalize_job_source(source))
+        sources.append(normalize_job_source(source))
     return sources
 
 
@@ -142,28 +144,30 @@ def resolve_job_sources(workspace_path: Path) -> LoadedJobSources:
     return LoadedJobSources([], "none", None)
 
 
-def discover_jobs_from_sources(sources: list[JobSource]) -> list[DiscoveredJob]:
+def discover_jobs_from_sources(sources: list[JobSource], profile: SearchProfile | None = None) -> list[DiscoveredJob]:
+    active_profile = profile or load_search_profile()
     jobs: list[DiscoveredJob] = []
     for source in sources:
-        jobs.extend(filter_discovered_jobs(discover_provider_jobs(source), source))
+        jobs.extend(filter_discovered_jobs(discover_provider_jobs(source), source, active_profile))
     return jobs
 
 
-def filter_discovered_jobs(jobs: list[DiscoveredJob], source: JobSource) -> list[DiscoveredJob]:
+def filter_discovered_jobs(jobs: list[DiscoveredJob], source: JobSource, profile: SearchProfile | None = None) -> list[DiscoveredJob]:
+    active_profile = profile or load_search_profile()
     include_keywords = _explicit_keywords(source.include_keywords)
     exclude_keywords = _effective_keywords(source.exclude_keywords, DEFAULT_EXCLUDE_KEYWORDS)
-    target_role_families = _effective_role_families(source.target_role_families)
+    target_role_families = _effective_role_families(source.target_role_families, active_profile.target_role_families)
+    profile_keywords = _explicit_keywords(active_profile.positive_keywords)
+    profile_negative_keywords = _explicit_keywords(active_profile.negative_keywords)
     filtered: list[DiscoveredJob] = []
     for job in jobs:
-        if _job_matches_source(job, target_role_families, include_keywords, exclude_keywords):
+        if _job_matches_source(job, target_role_families, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords, active_profile.excluded_levels):
             filtered.append(job)
     return filtered
 
 
 def _normalize_job_source(source: JobSource) -> JobSource:
-    company_slug = source.company_slug or source.board_token or source.account or slugify(source.company or source.provider)
-    target_role_families = _effective_role_families(source.target_role_families)
-    return source.model_copy(update={"company_slug": company_slug, "target_role_families": target_role_families})
+    return normalize_job_source(source)
 
 
 def _explicit_keywords(explicit: list[str]) -> list[str]:
@@ -175,9 +179,11 @@ def _effective_keywords(explicit: list[str], defaults: list[str]) -> list[str]:
     return values or defaults
 
 
-def _effective_role_families(explicit: list[str]) -> list[str]:
+def _effective_role_families(explicit: list[str], profile_role_families: list[str] | None = None) -> list[str]:
     values = [value.strip().lower() for value in explicit if value and value.strip()]
-    return values or list(DEFAULT_TARGET_ROLE_FAMILIES)
+    if values and profile_role_families:
+        return [value for value in values if value in [role.strip().lower() for role in profile_role_families]] or values
+    return values or [value.strip().lower() for value in (profile_role_families or DEFAULT_TARGET_ROLE_FAMILIES) if value and value.strip()]
 
 
 def _job_matches_source(
@@ -185,27 +191,41 @@ def _job_matches_source(
     target_role_families: list[str],
     include_keywords: list[str],
     exclude_keywords: list[str],
+    profile_keywords: list[str],
+    profile_negative_keywords: list[str],
+    excluded_levels: list[str],
 ) -> bool:
     family, _matched, _reason = classify_role_family(job)
     if family in NEGATIVE_ROLE_FAMILIES:
         return False
     if family not in target_role_families:
         return False
-    if not _has_title_signal(job, family, include_keywords):
+    if _job_matches_profile(job, profile_negative_keywords, excluded_levels):
         return False
-    return _job_matches_keywords(job, include_keywords, exclude_keywords)
+    if not _has_title_signal(job, family, include_keywords, profile_keywords):
+        return False
+    return _job_matches_keywords(job, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords)
 
 
-def _job_matches_keywords(job: DiscoveredJob, include_keywords: list[str], exclude_keywords: list[str]) -> bool:
+def _job_matches_keywords(
+    job: DiscoveredJob,
+    include_keywords: list[str],
+    exclude_keywords: list[str],
+    profile_keywords: list[str],
+    profile_negative_keywords: list[str],
+) -> bool:
     text = " ".join([job.title, job.company, job.location, job.description]).lower()
-    if include_keywords and not any(_phrase_in_text(text, term) for term in include_keywords):
+    required_keywords = include_keywords or profile_keywords
+    if required_keywords and not any(_phrase_in_text(text, term) for term in required_keywords):
         return False
     if any(_phrase_in_text(text, term) for term in exclude_keywords):
+        return False
+    if any(_phrase_in_text(text, term) for term in profile_negative_keywords):
         return False
     return True
 
 
-def _has_title_signal(job: DiscoveredJob, family: str, include_keywords: list[str]) -> bool:
+def _has_title_signal(job: DiscoveredJob, family: str, include_keywords: list[str], profile_keywords: list[str]) -> bool:
     title_text = (job.title or "").lower()
     if not title_text:
         return False
@@ -222,7 +242,7 @@ def _has_title_signal(job: DiscoveredJob, family: str, include_keywords: list[st
         return False
     if title_family == family:
         return True
-    if any(_phrase_in_text(title_text, term) for term in include_keywords):
+    if any(_phrase_in_text(title_text, term) for term in include_keywords + profile_keywords):
         return True
     return any(_phrase_in_text(title_text, term) for term in TITLE_SIGNAL_KEYWORDS)
 
@@ -230,6 +250,17 @@ def _has_title_signal(job: DiscoveredJob, family: str, include_keywords: list[st
 def _phrase_in_text(text: str, phrase: str) -> bool:
     pattern = r"\b" + re.escape(phrase.lower()) + r"\b"
     return re.search(pattern, text) is not None
+
+
+def _job_matches_profile(job: DiscoveredJob, profile_negative_keywords: list[str], excluded_levels: list[str]) -> bool:
+    if profile_negative_keywords:
+        text = " ".join([job.title, job.company, job.location, job.description]).lower()
+        if any(_phrase_in_text(text, term) for term in profile_negative_keywords):
+            return True
+
+    parsed_job = ParsedJob(title=job.title, company=job.company, location=job.location, description=job.description)
+    seniority, _flags = detect_seniority(parsed_job)
+    return seniority in {level.strip().lower() for level in excluded_levels if level and level.strip()}
 
 
 def _path_is_blank_or_empty_list(path: Path) -> bool:

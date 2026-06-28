@@ -22,6 +22,8 @@ SeniorityLevel = Literal[
     "entry_level",
     "junior",
     "mid",
+    "apprenticeship",
+    "contractor",
     "senior",
     "manager",
     "director",
@@ -77,6 +79,16 @@ class RolePack(BaseModel):
     search_terms: list[str] = Field(default_factory=list)
     bullet_templates: list[str] = Field(default_factory=list)
     answer_angles: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class SearchProfile(BaseModel):
+    name: str
+    target_role_families: list[str] = Field(default_factory=list)
+    positive_keywords: list[str] = Field(default_factory=list)
+    negative_keywords: list[str] = Field(default_factory=list)
+    preferred_work_styles: list[str] = Field(default_factory=list)
+    preferred_role_levels: list[str] = Field(default_factory=list)
+    excluded_levels: list[str] = Field(default_factory=list)
 
 
 class ParsedJob(BaseModel):

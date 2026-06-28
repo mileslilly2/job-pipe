@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .models import CandidateProfile, ParsedJob, RolePack
+from .classify import detect_seniority
+from .models import CandidateProfile, ParsedJob, RolePack, SearchProfile
 
 
 RESUME_KEYWORDS = [
@@ -178,7 +179,7 @@ def score_quality(job: ParsedJob, role_type: str, seniority: str) -> tuple[int, 
     return max(0, min(score, 100)), notes
 
 
-def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None) -> tuple[int, list[str]]:
+def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, profile: SearchProfile | None = None) -> tuple[int, list[str]]:
     text = " ".join(
         str(value or "")
         for value in [
@@ -234,9 +235,53 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None) ->
             score -= penalty
             notes.append(f"-{penalty} penalty: seniority signal '{phrase}'")
 
-    if remote_flag and not _has_phrase(text, "remote"):
-        score += 2
-        notes.append("+2 remote flag from structured source")
+    if profile:
+        if family in {value.strip().lower() for value in profile.target_role_families if value and value.strip()}:
+            score += 8
+            notes.append("+8 profile boost: target role family")
+
+        profile_positive_matches = [keyword for keyword in profile.positive_keywords if _has_phrase(text, keyword)]
+        if profile_positive_matches:
+            score += min(len(profile_positive_matches) * 3, 18)
+            for keyword in profile_positive_matches:
+                notes.append(f"+3 profile keyword match: {keyword}")
+
+        profile_negative_matches = [keyword for keyword in profile.negative_keywords if _has_phrase(text, keyword)]
+        if profile_negative_matches:
+            penalty = min(len(profile_negative_matches) * 6, 24)
+            score -= penalty
+            for keyword in profile_negative_matches:
+                notes.append(f"-{min(6, penalty)} profile negative keyword: {keyword}")
+
+        parsed_job = ParsedJob(
+            title=_field(job, "title"),
+            company=_field(job, "company"),
+            location=_field(job, "location"),
+            description=_field(job, "description"),
+            remote_type="remote" if remote_flag else _field(job, "remote_type"),
+            employment_type=_field(job, "employment_type"),
+        )
+        detected_level, level_flags = detect_seniority(parsed_job)
+        if level_flags:
+            notes.extend(level_flags)
+        preferred_levels = {value.strip().lower() for value in profile.preferred_role_levels if value and value.strip()}
+        excluded_levels = {value.strip().lower() for value in profile.excluded_levels if value and value.strip()}
+        preferred_work_styles = {value.strip().lower() for value in profile.preferred_work_styles if value and value.strip()}
+        if detected_level in preferred_levels:
+            score += 6
+            notes.append(f"+6 profile boost: preferred role level {detected_level}")
+        if detected_level in excluded_levels:
+            score -= 30
+            notes.append(f"-30 profile penalty: excluded role level {detected_level}")
+        if remote_flag and "remote" in preferred_work_styles:
+            score += 4
+            notes.append("+4 profile boost: remote work style")
+        if "hybrid" in text and "hybrid" in preferred_work_styles:
+            score += 3
+            notes.append("+3 profile boost: hybrid work style")
+        if "contract" in detected_level and "contractor" in preferred_levels:
+            score += 4
+            notes.append("+4 profile boost: contractor level")
 
     # Learned adjustments
     if learned_weights:
