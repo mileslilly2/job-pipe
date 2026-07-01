@@ -8,6 +8,7 @@ from typing import Any
 from .catalog import load_search_profile
 from .db import get_job
 from .facts import build_fact_report
+from .job_requirements import build_fit_summary, build_resume_tailoring
 from .score import RESUME_KEYWORDS, score_job_fit_v1
 from .utils import ensure_dir, normalize_text, root_dir, slugify
 
@@ -113,15 +114,17 @@ def build_application_package(job_id: int, profile_file: Path | None = None) -> 
     job = dict(job_row)
     base_profile = load_base_profile(profile_file)
     fit_score, fact_report = _fit_context(job)
+    fit_summary = build_fit_summary(job, base_profile)
+    tailoring = build_resume_tailoring(job, base_profile)
 
     directory = package_directory_for_job(job)
     ensure_dir(directory)
     paths = application_package_paths(job)
 
     paths.job_md.write_text(_build_job_md(job), encoding="utf-8")
-    paths.fit_md.write_text(_build_fit_md(fit_score, fact_report), encoding="utf-8")
-    paths.resume_tailored_md.write_text(_build_resume_tailored_md(job, base_profile), encoding="utf-8")
-    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, fact_report), encoding="utf-8")
+    paths.fit_md.write_text(_build_fit_md(fit_score, fit_summary), encoding="utf-8")
+    paths.resume_tailored_md.write_text(_build_resume_tailored_md(tailoring), encoding="utf-8")
+    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, fact_report, tailoring), encoding="utf-8")
     paths.apply_md.write_text(_build_apply_md(job, job_id), encoding="utf-8")
     return paths
 
@@ -193,71 +196,58 @@ def _build_job_md(job: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_fit_md(fit_score: int, fact_report) -> str:
+def _build_fit_md(fit_score: int, fit_summary) -> str:
     lines = [
         "# Fit",
         "",
         f"- Fit score: {fit_score}/100",
         "",
-        "## Matched",
+        "## Matched Requirements",
         "",
     ]
-    lines.extend(f"- {item}" for item in (fact_report.matched or ["None"]))
-    lines.extend(["", "## Missing / Mismatched", ""])
-    lines.extend(f"- {item}" for item in (fact_report.missing_mismatched or ["None"]))
+    lines.extend(f"- {item}" for item in (fit_summary.matched_requirements or ["None"]))
+    lines.extend(["", "## Missing Requirements", ""])
+    lines.extend(f"- {item}" for item in (fit_summary.missing_requirements or ["None"]))
     lines.extend(["", "## Concerns", ""])
-    lines.extend(f"- {item}" for item in (fact_report.concerns or ["None recorded."]))
+    lines.extend(f"- {item}" for item in (fit_summary.concerns or ["None recorded."]))
+    lines.extend(["", "## Suggested Emphasis", ""])
+    lines.extend(f"- {item}" for item in (fit_summary.suggested_emphasis or ["None recorded."]))
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_resume_tailored_md(job: dict[str, Any], base_profile: BaseProfile) -> str:
-    job_text = " ".join(
-        str(value or "")
-        for value in (
-            job.get("title"),
-            job.get("company"),
-            job.get("location"),
-            job.get("description"),
-            job.get("raw_text"),
-        )
-    ).lower()
-    focus_terms = _select_focus_terms(job_text)
-    summary = base_profile.summary
-    if focus_terms:
-        summary = f"{summary} For this role, I would foreground { _join_phrases(focus_terms[:3]) }."
-
-    skills = _select_skills(base_profile.skills, job_text)
-    projects = _select_projects(base_profile.projects, job_text)
-
+def _build_resume_tailored_md(tailoring) -> str:
     lines = [
         "# Tailored Resume",
         "",
         "## Summary",
         "",
-        summary or "Project-focused technical problem solver.",
+        tailoring.summary or "Project-focused technical problem solver.",
         "",
         "## Relevant Skills",
         "",
     ]
-    lines.extend(f"- {skill}" for skill in skills)
+    lines.extend(f"- {skill}" for skill in (tailoring.selected_skills or ["None"]))
     lines.extend(["", "## Selected Projects", ""])
-    for project in projects:
-        lines.extend([f"### {project.title}", ""])
-        lines.extend(f"- {bullet}" for bullet in project.bullets)
+    for project in tailoring.selected_projects:
+        lines.extend([f"### {project['title']}", ""])
+        lines.extend(f"- {bullet}" for bullet in (project.get("bullets") or []))
         lines.append("")
-    lines.extend(["## Education", ""])
-    lines.extend(f"- {line}" for line in (base_profile.education or ["No education section in base profile."]))
+    lines.extend(["## Suggested Emphasis", ""])
+    lines.extend(f"- {item}" for item in (tailoring.emphasis or ["None recorded."]))
+    lines.extend(["", "## Education", ""])
+    lines.extend(f"- {line}" for line in (tailoring.education or ["No education section in base profile."]))
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_cover_note_md(job: dict[str, Any], fit_score: int, fact_report) -> str:
+def _build_cover_note_md(job: dict[str, Any], fit_score: int, fact_report, tailoring) -> str:
     company = job.get("company") or "your team"
     title = job.get("title") or "role"
-    focus = ", ".join(item.split(": ", 1)[-1] for item in fact_report.matched[:3]) if fact_report.matched else "practical problem solving"
+    focus = ", ".join(tailoring.selected_skills[:4]) if tailoring.selected_skills else "practical problem solving"
+    project_focus = tailoring.selected_projects[0]["title"] if tailoring.selected_projects else "repeatable workflows"
     lines = [
         f"I am writing to apply for the {title} role at {company}. The posting looks like a good fit for my background in {focus}.",
         "",
-        "I have built local automation pipelines, debugging scripts, and repeatable workflows with Python, SQLite, CLI tooling, and tests, and I am comfortable turning vague problems into clear steps.",
+        f"I have built local automation pipelines, debugging scripts, and repeatable workflows around {project_focus}, and I am comfortable turning vague problems into clear steps.",
         "",
         f"This package reflects a measured fit score of {fit_score}/100, and I would be glad to discuss how I could contribute in a practical, reliable way.",
     ]

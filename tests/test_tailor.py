@@ -1,7 +1,9 @@
 from pathlib import Path
 
+from jobpipe.application_package import load_base_profile
 from jobpipe.classify import classify_job
-from jobpipe.models import CandidateProfile, RolePack
+from jobpipe.job_requirements import build_resume_tailoring, extract_job_requirements
+from jobpipe.models import CandidateProfile, ParsedJob, RolePack
 from jobpipe.parse import parse_job_text
 from jobpipe.tailor import tailor_job
 from jobpipe.utils import load_yaml
@@ -31,3 +33,37 @@ def test_tailoring_avoids_forbidden_claims() -> None:
     for item in forbidden:
         assert item not in text.lower()
     assert all(bullet.provenance for bullet in tailored.tailored_bullets)
+
+
+def test_requirement_parser_and_resume_tailoring_are_deterministic() -> None:
+    job = ParsedJob(
+        title="Python Automation Engineer",
+        company="Acme Co",
+        location="Remote",
+        description="""
+        Requirements:
+        - Python
+        - SQL
+
+        Preferred:
+        - Playwright
+
+        Responsibilities:
+        - Build automation workflows and document results.
+        - Support debugging and testing.
+        """,
+        raw_text="Python SQL Playwright automation",
+    )
+    requirements = extract_job_requirements(job)
+    assert "Python" in requirements.required_skills
+    assert "SQL" in requirements.required_skills
+    assert "Playwright" in requirements.preferred_skills
+    assert requirements.responsibilities
+
+    profile = load_base_profile(Path("profile.md"))
+    first = build_resume_tailoring(job, profile)
+    second = build_resume_tailoring(job, profile)
+    assert first == second
+    assert "8+ years" not in first.summary.lower()
+    assert first.selected_skills
+    assert first.selected_projects

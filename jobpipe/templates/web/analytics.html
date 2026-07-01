@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card stack">
+  <div class="actions">
+    <a class="button" href="/">Summary</a>
+    <a class="button" href="/jobs">Jobs</a>
+    <a class="button" href="/followups">Follow-ups</a>
+  </div>
+  <h2>Analytics</h2>
+  <div class="muted">Local, deterministic metrics for choosing what to apply to next.</div>
+</section>
+
+<section class="grid cards">
+  <div class="card"><div class="muted">Applications today</div><div class="stat">{{ report.summary.applications_today }}</div></div>
+  <div class="card"><div class="muted">Applications this week</div><div class="stat">{{ report.summary.applications_this_week }}</div></div>
+  <div class="card"><div class="muted">Saved not packaged</div><div class="stat">{{ report.summary.saved_not_packaged }}</div></div>
+  <div class="card"><div class="muted">Packaged not applied</div><div class="stat">{{ report.summary.packaged_not_applied }}</div></div>
+  <div class="card"><div class="muted">Follow-ups due</div><div class="stat">{{ report.summary.followups_due }}</div></div>
+</section>
+
+<section class="card stack">
+  <h3>Top 10 Jobs to Apply Today</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Role</th>
+          <th>Seniority</th>
+          <th>Status</th>
+          <th>Package</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in report.top_apply_today %}
+        <tr>
+          <td>{{ job.score }}</td>
+          <td>{{ job.company }}</td>
+          <td><a href="/jobs/{{ job.id }}">{{ job.title }}</a></td>
+          <td>{{ job.role_type }}</td>
+          <td>{{ job.seniority_level }}</td>
+          <td><span class="pill">{{ job.status }}</span></td>
+          <td>{{ "yes" if job.has_package else "no" }}</td>
+          <td>{{ job.source }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card stack">
+    <h3>Top Role Families by Score</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Role Family</th><th>Jobs</th><th>Avg Score</th><th>High-Fit</th></tr>
+        </thead>
+        <tbody>
+          {% for item in report.top_role_families_by_score %}
+          <tr>
+            <td>{{ item.role_family }}</td>
+            <td>{{ item.count }}</td>
+            <td>{{ item.average_score }}</td>
+            <td>{{ item.high_fit_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <h3>Top Sources by High-Fit Jobs</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Count</th><th>Avg Score</th></tr>
+        </thead>
+        <tbody>
+          {% for item in report.top_sources_by_high_fit_jobs %}
+          <tr>
+            <td>{{ item.source }}</td>
+            <td>{{ item.count }}</td>
+            <td>{{ item.average_score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card stack">
+    <h3>Skip Reasons</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Reason</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for item in report.skip_reasons %}
+          <tr>
+            <td>{{ item.reason }}</td>
+            <td>{{ item.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <h3>Apply / Save Rate by Role Family</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Role Family</th><th>Total</th><th>Saved</th><th>Applied</th><th>Saved Rate</th><th>Applied Rate</th></tr>
+        </thead>
+        <tbody>
+          {% for item in report.role_family_rates %}
+          <tr>
+            <td>{{ item.role_family }}</td>
+            <td>{{ item.total }}</td>
+            <td>{{ item.saved_count }}</td>
+            <td>{{ item.applied_count }}</td>
+            <td>{{ "%.1f"|format(item.saved_rate * 100) }}%</td>
+            <td>{{ "%.1f"|format(item.applied_rate * 100) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

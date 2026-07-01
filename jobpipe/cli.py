@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 from rich.console import Console
 from rich.table import Table
 
-from .browser import open_url
+from .browser import copy_file, open_path, open_url
 from .application_package import application_package_paths, build_application_package
 from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, source_identity, source_identity_label
 from .facts import build_fact_report
@@ -38,6 +38,7 @@ from .packet import build_packet_context
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .recommend import make_recommendation
+from .analytics import build_analytics_report
 from .score import score_fit, score_job_fit_v1, score_quality, score_risk
 from .tailor import tailor_job
 from .tracker import ALLOWED_STATUSES, due_followups, update_status
@@ -265,6 +266,71 @@ def _print_fact_section(title: str, items: list[str]) -> None:
         console.print("- None")
 
 
+def _print_analytics_report(report) -> None:
+    summary = Table(title="Analytics Summary")
+    summary.add_column("Metric")
+    summary.add_column("Count")
+    summary.add_row("Applications today", str(report.summary["applications_today"]))
+    summary.add_row("Applications this week", str(report.summary["applications_this_week"]))
+    summary.add_row("Saved not packaged", str(report.summary["saved_not_packaged"]))
+    summary.add_row("Packaged not applied", str(report.summary["packaged_not_applied"]))
+    summary.add_row("Follow-ups due", str(report.summary["followups_due"]))
+    summary.add_row("High-fit jobs", str(report.summary["high_fit_jobs"]))
+    summary.add_row("Active jobs", str(report.summary["active_jobs"]))
+    console.print(summary)
+
+    top_jobs = Table(title="Top 10 Jobs to Apply Today")
+    for column in ["Score", "Company", "Title", "Role", "Seniority", "Status", "Package", "Source"]:
+        top_jobs.add_column(column)
+    for job in report.top_apply_today:
+        top_jobs.add_row(
+            str(job["score"]),
+            job["company"],
+            job["title"],
+            job["role_type"],
+            job["seniority_level"],
+            job["status"],
+            "yes" if job["has_package"] else "no",
+            job["source"],
+        )
+    console.print(top_jobs)
+
+    families = Table(title="Top Role Families by Score")
+    for column in ["Role Family", "Jobs", "Avg Score", "High-Fit"]:
+        families.add_column(column)
+    for item in report.top_role_families_by_score:
+        families.add_row(item["role_family"], str(item["count"]), str(item["average_score"]), str(item["high_fit_count"]))
+    console.print(families)
+
+    sources = Table(title="Top Sources by High-Fit Jobs")
+    for column in ["Source", "Count", "Avg Score"]:
+        sources.add_column(column)
+    for item in report.top_sources_by_high_fit_jobs:
+        sources.add_row(item["source"], str(item["count"]), str(item["average_score"]))
+    console.print(sources)
+
+    skips = Table(title="Skip Reasons")
+    skips.add_column("Reason")
+    skips.add_column("Count")
+    for item in report.skip_reasons:
+        skips.add_row(item["reason"], str(item["count"]))
+    console.print(skips)
+
+    rates = Table(title="Apply / Save Rate by Role Family")
+    for column in ["Role Family", "Total", "Saved", "Applied", "Saved Rate", "Applied Rate"]:
+        rates.add_column(column)
+    for item in report.role_family_rates:
+        rates.add_row(
+            item["role_family"],
+            str(item["total"]),
+            str(item["saved_count"]),
+            str(item["applied_count"]),
+            f"{item['saved_rate']:.1%}",
+            f"{item['applied_rate']:.1%}",
+        )
+    console.print(rates)
+
+
 def _job_apply_url(job: dict) -> str:
     return str(job.get("apply_url") or job.get("source_url") or "")
 
@@ -274,6 +340,14 @@ def _ensure_application_package(job_id: int, job: dict) -> tuple[Path, Path, Pat
     if not all(path.exists() for path in [paths.job_md, paths.fit_md, paths.resume_tailored_md, paths.cover_note_md, paths.apply_md]):
         paths = build_application_package(job_id)
     return paths.resume_tailored_md, paths.cover_note_md, paths.apply_md
+
+
+def _package_directory(job: dict) -> Path:
+    return application_package_paths(job).directory
+
+
+def _package_file(job: dict, filename: str) -> Path:
+    return _package_directory(job) / filename
 
 
 def _apply_flow_session(job_id: int, reason: str | None = None, note: str | None = None) -> None:
@@ -774,6 +848,13 @@ def due(limit: int = typer.Option(20, min=1, help="Maximum number of due follow-
     console.print(table)
 
 
+@app.command("analytics")
+def analytics() -> None:
+    _ensure_workspace()
+    report = build_analytics_report()
+    _print_analytics_report(report)
+
+
 @app.command("open")
 def open_command(job_id: int) -> None:
     row = get_job(job_id)
@@ -781,6 +862,86 @@ def open_command(job_id: int) -> None:
         raise typer.BadParameter("No source URL stored for this job.")
     opened = open_url(row["source_url"])
     console.print("Opened browser." if opened else "Browser open request failed.")
+
+
+@app.command("browser-open")
+def browser_open(job_id: int, copy: list[str] = typer.Option([], "--copy", help="Copy resume or cover note text to the clipboard.")) -> None:
+    _ensure_workspace()
+    row = get_job(job_id)
+    if not row:
+        raise typer.BadParameter(f"Job {job_id} not found.")
+    job = dict(row)
+    apply_url = _job_apply_url(job)
+    if not apply_url:
+        raise typer.BadParameter("No apply URL stored for this job.")
+
+    directory = _package_directory(job)
+    ensure_dir(directory)
+    opened_folder = open_path(directory)
+    opened_url = open_url(apply_url)
+
+    copied: list[str] = []
+    for item in copy:
+        key = item.strip().lower()
+        if key in {"resume", "resume-text", "resume-tailored"}:
+            path = _package_file(job, "resume-tailored.md")
+            if not path.exists():
+                raise typer.BadParameter("Run package before copying the resume text.")
+            if not copy_file(path):
+                raise typer.BadParameter("Clipboard copy failed.")
+            copied.append("resume-tailored.md")
+            continue
+        if key in {"cover", "cover-note", "cover-note.md"}:
+            path = _package_file(job, "cover-note.md")
+            if not path.exists():
+                raise typer.BadParameter("Run package before copying the cover note.")
+            if not copy_file(path):
+                raise typer.BadParameter("Clipboard copy failed.")
+            copied.append("cover-note.md")
+            continue
+        raise typer.BadParameter(f"Unsupported copy target: {item}")
+
+    console.print("Opened package folder." if opened_folder else "Package folder open request failed.")
+    console.print("Opened apply URL." if opened_url else "Browser open request failed.")
+    if copied:
+        console.print(f"Copied to clipboard: {', '.join(copied)}")
+
+
+@app.command("browser-assist")
+def browser_assist(job_id: int) -> None:
+    _ensure_workspace()
+    row = get_job(job_id)
+    if not row:
+        raise typer.BadParameter(f"Job {job_id} not found.")
+    job = dict(row)
+    apply_url = _job_apply_url(job)
+    if not apply_url:
+        raise typer.BadParameter("No apply URL stored for this job.")
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise typer.BadParameter("Playwright is not installed.") from exc
+
+    console.print(f"Opening assistive browser for job {job_id}.")
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=False)
+        page = browser.new_page()
+        page.goto(apply_url, wait_until="domcontentloaded")
+        page.evaluate(
+            """
+            () => {
+              const targets = document.querySelectorAll('input, textarea, select');
+              targets.forEach((el) => {
+                el.style.outline = '3px solid #1f6feb';
+                el.style.outlineOffset = '2px';
+              });
+            }
+            """
+        )
+        console.print("Highlighted likely form fields. No submission was attempted.")
+        input("Press Enter to close the browser helper...")
+        browser.close()
 
 
 @app.command("web")

@@ -25,6 +25,15 @@
     <form method="post" action="/jobs/{{ job.id }}/apply-flow?next={{ ('/jobs/' ~ job.id) | urlencode }}">
       <button class="primary" type="submit">Open apply URL</button>
     </form>
+    <form method="post" action="/jobs/{{ job.id }}/open-package?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="secondary" type="submit">Open package folder</button>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/copy-cover-note?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="secondary" type="submit">Copy cover note</button>
+    </form>
+    <form method="post" action="/jobs/{{ job.id }}/copy-resume-text?next={{ ('/jobs/' ~ job.id) | urlencode }}">
+      <button class="secondary" type="submit">Copy resume text</button>
+    </form>
   </div>
 </section>
 

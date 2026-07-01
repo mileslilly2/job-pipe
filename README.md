@@ -143,7 +143,8 @@ jobpipe export
 - The browser opens automatically unless `--no-open` is passed.
 - Open `/kanban` for the pipeline board.
 - Open `/views` for saved job filters that link back to `/jobs`.
-- The UI stays read-only except for the existing save, skip, package, open-apply, and status move actions.
+- The UI stays read-only except for the existing save, skip, package, open-apply, open-package, copy-cover-note, copy-resume-text, and status move actions.
+- Safe automation is assistive only: the app can open URLs, open local folders, and copy generated text, but it does not auto-submit forms, store passwords, or bypass CAPTCHAs.
 
 ## Commands
 
@@ -187,3 +188,4 @@ jobpipe export
 - **Deterministic Learning**: Job-Pipe learns from your review decisions (save, skip, package, apply). If you repeatedly save jobs with a certain role family or keyword, its weight increases. If you skip them, its weight decreases. Adjustments are stored in `data/learned_weights.yaml` and are capped at +/- 20 to ensure hard filters are never overridden.
 - Tailoring is constrained by the candidate profile and never invents paid experience, tools, certifications, or years of experience.
 - `profile.md` is the editable local base resume/profile used for package generation.
+- `jobpipe analytics` and `/analytics` summarize local tracker data so you can pick the 10 strongest jobs to apply to today.

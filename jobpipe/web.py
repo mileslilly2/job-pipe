@@ -10,7 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .application_package import application_package_paths, build_application_package
-from .browser import open_url
+from .analytics import build_analytics_report
+from .browser import copy_file, open_path, open_url
 from .catalog import load_search_profile
 from .db import due_followups, fetch_one, get_analysis, get_application, get_job, insert_feedback, list_jobs, set_review_status
 from .facts import build_fact_report
@@ -192,6 +193,17 @@ def create_app() -> FastAPI:
         context = _job_detail_context(job_id)
         return templates.TemplateResponse(request, "job_detail.html", context)
 
+    @app.get("/analytics", response_class=HTMLResponse)
+    def analytics(request: Request):
+        report = build_analytics_report()
+        return templates.TemplateResponse(
+            request,
+            "analytics.html",
+            {
+                "report": report,
+            },
+        )
+
     @app.post("/jobs/{job_id}/save")
     def save_job(job_id: int, next: str | None = None):
         _require_job(job_id)
@@ -226,6 +238,34 @@ def create_app() -> FastAPI:
         if not apply_url:
             raise HTTPException(status_code=400, detail="No apply URL stored for this job.")
         open_url(apply_url)
+        return _redirect(next, f"/jobs/{job_id}")
+
+    @app.post("/jobs/{job_id}/open-package")
+    def open_package(job_id: int, next: str | None = None):
+        job = dict(_require_job(job_id))
+        directory = application_package_paths(job).directory
+        directory.mkdir(parents=True, exist_ok=True)
+        open_path(directory)
+        return _redirect(next, f"/jobs/{job_id}")
+
+    @app.post("/jobs/{job_id}/copy-cover-note")
+    def copy_cover_note(job_id: int, next: str | None = None):
+        job = dict(_require_job(job_id))
+        path = application_package_paths(job).cover_note_md
+        if not path.exists():
+            raise HTTPException(status_code=400, detail="Run package before copying the cover note.")
+        if not copy_file(path):
+            raise HTTPException(status_code=400, detail="Clipboard copy failed.")
+        return _redirect(next, f"/jobs/{job_id}")
+
+    @app.post("/jobs/{job_id}/copy-resume-text")
+    def copy_resume_text(job_id: int, next: str | None = None):
+        job = dict(_require_job(job_id))
+        path = application_package_paths(job).resume_tailored_md
+        if not path.exists():
+            raise HTTPException(status_code=400, detail="Run package before copying the resume text.")
+        if not copy_file(path):
+            raise HTTPException(status_code=400, detail="Clipboard copy failed.")
         return _redirect(next, f"/jobs/{job_id}")
 
     @app.post("/jobs/{job_id}/status/{status}")
@@ -540,6 +580,7 @@ def _job_detail_context(job_id: int) -> dict[str, Any]:
             "score_notes": notes,
             "display_status": _display_status(job),
             "apply_url": _job_apply_url(job),
+            "package_directory": str(application_package_paths(job).directory),
         },
         "analysis": _analysis_context(analysis_row),
         "application": dict(application_row) if application_row else None,

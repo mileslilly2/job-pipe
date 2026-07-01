@@ -238,3 +238,46 @@ def test_followups_page_lists_due_jobs(client: TestClient) -> None:
     assert "Follow Up Co" in resp.text
     assert "Data Engineer" in resp.text
     assert "applied" in resp.text
+
+
+def test_analytics_page_and_browser_actions(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    job_id = insert_job(_job_payload("Browser Co", "Python Automation Engineer", external_id="job-browser"), review_status="new")
+    upsert_analysis(
+        job_id,
+        {
+            "role_type": "python_automation",
+            "seniority_level": "junior",
+            "fit_score": 88,
+            "risk_score": 8,
+            "quality_score": 74,
+            "recommendation": "apply",
+            "skip_reason": None,
+            "matched_keywords": ["python", "sql"],
+            "missing_keywords": ["aws"],
+            "red_flags": [],
+            "eligibility_flags": [],
+            "notes": "web analytics test note",
+        },
+    )
+    assert client.post(f"/jobs/{job_id}/save?next=/jobs/{job_id}", follow_redirects=False).status_code == 303
+    assert client.post(f"/jobs/{job_id}/package?next=/jobs/{job_id}", follow_redirects=False).status_code == 303
+
+    opened_paths: list[str] = []
+    copied: list[str] = []
+    monkeypatch.setattr(web_module, "open_path", lambda path: opened_paths.append(str(path)) or True)
+    monkeypatch.setattr(web_module, "copy_file", lambda path: copied.append(Path(path).name) or True)
+
+    analytics = client.get("/analytics")
+    assert analytics.status_code == 200
+    assert "Applications today" in analytics.text
+    assert "Top 10 Jobs to Apply Today" in analytics.text
+
+    open_package = client.post(f"/jobs/{job_id}/open-package?next=/jobs/{job_id}", follow_redirects=False)
+    assert open_package.status_code == 303
+    assert opened_paths and opened_paths[0].endswith("applications/browser-co-python-automation-engineer")
+
+    copy_cover = client.post(f"/jobs/{job_id}/copy-cover-note?next=/jobs/{job_id}", follow_redirects=False)
+    assert copy_cover.status_code == 303
+    copy_resume = client.post(f"/jobs/{job_id}/copy-resume-text?next=/jobs/{job_id}", follow_redirects=False)
+    assert copy_resume.status_code == 303
+    assert copied == ["cover-note.md", "resume-tailored.md"]

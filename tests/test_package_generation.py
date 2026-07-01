@@ -37,10 +37,10 @@ def test_package_creates_deterministic_bundle(initialized_workspace, runner) -> 
     assert "Provider: greenhouse" in job_md.read_text(encoding="utf-8")
     fit_text = fit_md.read_text(encoding="utf-8")
     assert "Fit score:" in fit_text
-    assert "## Matched" in fit_text
-    assert "## Missing / Mismatched" in fit_text
+    assert "## Matched Requirements" in fit_text
+    assert "## Missing Requirements" in fit_text
     assert "## Concerns" in fit_text
-    assert "role family" in fit_text.lower()
+    assert "## Suggested Emphasis" in fit_text
     assert "Python" in resume_md.read_text(encoding="utf-8")
     assert "SQLite" in resume_md.read_text(encoding="utf-8")
     cover_text = cover_md.read_text(encoding="utf-8")
