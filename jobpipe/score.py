@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from .facts import ROLE_FAMILY_SCORES, build_fact_report, classify_role_family as _classify_role_family, extract_job_facts
+from .knowledge import build_knowledge_report
 from .models import CandidateProfile, ParsedJob, RolePack, SearchProfile
 
 
@@ -32,6 +33,14 @@ TECHNICAL_OPS_TERMS = (
 )
 
 PROGRAMMING_TERMS = ("python", "automation", "scripting", "cli", "pipeline", "pipelines", "sql", "api", "testing", "terraform", "bash", "git")
+
+HARD_FAMILY_SCORE_CAPS = {
+    "legal_counsel": 30,
+    "security_only": 42,
+    "ml_research": 45,
+    "senior_research": 38,
+    "data_products": 36,
+}
 
 classify_role_family = _classify_role_family
 
@@ -180,14 +189,15 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
     if family_reason:
         notes.append(family_reason)
 
+    knowledge_report = build_knowledge_report(job, profile=profile)
+    if knowledge_report.matches or knowledge_report.profile_boosts or knowledge_report.conflict_penalties:
+        score += knowledge_report.score_adjustment
+        notes.extend(knowledge_report.notes)
+
     keyword_hits: list[str] = []
     for keyword in RESUME_KEYWORDS:
         if _has_phrase(text, keyword):
             keyword_hits.append(keyword)
-    if keyword_hits:
-        score += min(len(keyword_hits) * 4, 20)
-        for keyword in keyword_hits:
-            notes.append(f"+4 keyword match: {keyword}")
 
     job_facts = extract_job_facts(job)
     if job_facts.seniority in {"junior", "entry", "internship", "apprenticeship"}:
@@ -206,29 +216,11 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
         score += 2
         notes.append("+2 boost: hybrid-friendly")
 
-    if profile:
-        profile_target_families = {value.strip().lower() for value in profile.target_role_families if value and value.strip()}
-        if family in profile_target_families:
-            score += 8
-            notes.append("+8 profile boost: target role family")
-
-        profile_positive_matches = [keyword for keyword in profile.positive_keywords if _has_phrase(text, keyword)]
-        if profile_positive_matches:
-            score += min(len(profile_positive_matches) * 3, 18)
-            for keyword in profile_positive_matches:
-                notes.append(f"+3 profile keyword match: {keyword}")
-
-        profile_negative_matches = [keyword for keyword in profile.negative_keywords if _has_phrase(text, keyword)]
-        if profile_negative_matches:
-            penalty = min(len(profile_negative_matches) * 6, 24)
-            score -= penalty
-            for keyword in profile_negative_matches:
-                notes.append(f"-{min(6, penalty)} profile negative keyword: {keyword}")
-
-        report = build_fact_report(job, profile)
-        if report.notes:
-            notes.extend(report.notes)
-        score += report.score_adjustment
+    fact_report = build_fact_report(job, profile) if profile is not None else None
+    if fact_report is not None:
+        score += fact_report.score_adjustment
+        if fact_report.notes:
+            notes.extend(fact_report.notes)
 
         if job_facts.remote and "remote" in {value.strip().lower() for value in profile.preferred_work_styles if value and value.strip()}:
             score += 4
@@ -246,7 +238,6 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
             score -= 30
             notes.append(f"-30 profile penalty: excluded role level {job_facts.seniority}")
 
-    # Learned adjustments
     if learned_weights:
         role_adjustments = learned_weights.get("role_families", {})
         if family in role_adjustments:
@@ -260,6 +251,17 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
                 adj = keyword_adjustments[kw]
                 score += adj
                 notes.append(f"{adj:+d} learned adjustment: keyword '{kw}'")
+
+    family_cap = HARD_FAMILY_SCORE_CAPS.get(family)
+    if family_cap is not None and score > family_cap:
+        score = family_cap
+        notes.append(f"hard family ceiling: {family} ({family_cap})")
+
+    location_cap, location_reason = _location_score_cap(_field(job, "location"), profile)
+    if score > location_cap:
+        score = location_cap
+        if location_reason:
+            notes.append(f"hard location ceiling: {location_reason} ({location_cap})")
 
     score = max(0, min(score, 100))
     notes.append(f"final score: {score}")
@@ -285,3 +287,67 @@ def _has_programming_signals(text: str) -> bool:
 def _has_phrase(text: str, phrase: str) -> bool:
     pattern = r"\b" + re.escape(phrase.lower()) + r"\b"
     return re.search(pattern, text) is not None
+
+
+def _location_score_cap(location: str, profile: SearchProfile | None) -> tuple[int, str | None]:
+    normalized = _normalize_location(location)
+    if not normalized:
+        return 100, None
+    if _location_is_foreign_onsite(location):
+        return 92, "foreign onsite location"
+    if _location_mentions_canada(location):
+        allowed = profile is not None and any(_location_term_matches(location, term) for term in profile.allowed_locations)
+        if not allowed:
+            return 88, "Canada-only location not allowed"
+    return 100, None
+
+
+def _normalize_location(value: str) -> str:
+    cleaned = "".join(char.lower() if char.isalnum() else " " for char in value)
+    return " ".join(cleaned.split())
+
+
+def _location_term_matches(location: str, term: str) -> bool:
+    normalized_location = _normalize_location(location)
+    normalized_term = _normalize_location(term)
+    if not normalized_location or not normalized_term:
+        return False
+    if normalized_term in {"remote us", "remote united states", "remote usa"}:
+        return _location_is_remote(location) and _location_mentions_us(location)
+    if normalized_term in {"united states", "usa", "us"}:
+        return _location_mentions_us(location)
+    if normalized_term in {"us canada okay", "us canada", "us/canada okay", "north america"}:
+        return _location_mentions_us(location) or _location_mentions_canada(location)
+    if normalized_term in {"canada", "canada only"}:
+        return _location_mentions_canada(location)
+    if normalized_term in {"uk", "united kingdom", "uk only"}:
+        return any(term in normalized_location for term in ("uk", "united kingdom", "london", "britain", "british"))
+    if normalized_term in {"europe", "europe only"}:
+        return any(term in normalized_location for term in ("europe", "european union", "eu", "paris", "dublin", "berlin", "amsterdam", "madrid", "frankfurt"))
+    if normalized_term in {"paris", "london", "dublin", "sydney"}:
+        return normalized_term in normalized_location
+    return normalized_term in normalized_location
+
+
+def _location_is_remote(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("remote", "work from home", "wfh", "fully remote"))
+
+
+def _location_mentions_us(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("united states", "usa", "u s a", "us based", "us only", "remote us", "us remote")) or re.search(r"\bus\b", normalized) is not None
+
+
+def _location_mentions_canada(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("canada", "toronto", "vancouver", "montreal", "calgary", "ottawa", "waterloo"))
+
+
+def _location_is_foreign_onsite(location: str) -> bool:
+    if _location_is_remote(location):
+        return False
+    normalized = _normalize_location(location)
+    if _location_mentions_us(location) or _location_mentions_canada(location):
+        return False
+    return any(term in normalized for term in ("paris", "london", "dublin", "sydney", "uk", "united kingdom", "europe", "france", "germany", "spain", "netherlands", "ireland", "australia"))

@@ -1,3 +1,4 @@
+from jobpipe.catalog import load_search_profile
 from jobpipe.models import DiscoveredJob
 from jobpipe.score import classify_role_family, score_job_fit_v1
 
@@ -64,6 +65,101 @@ def test_remote_bonus_cannot_overcome_bad_role_family() -> None:
     assert remote_support_score < onsite_target_score
     assert any("remote-friendly" in note for note in remote_support_notes)
     assert any("role family: help_desk" in note for note in remote_support_notes)
+
+
+def test_non_target_professional_families_score_low() -> None:
+    product_counsel = DiscoveredJob(
+        provider="lever",
+        external_id="legal-1",
+        company="Legal Co",
+        title="Product Counsel",
+        location="Paris, France",
+        remote=False,
+        apply_url="https://example.com/legal-1",
+        description="Counsel for product and platform teams with backend APIs and compliance",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+    data_products = DiscoveredJob(
+        provider="lever",
+        external_id="legal-2",
+        company="Data Co",
+        title="Data Products",
+        location="London, UK",
+        remote=False,
+        apply_url="https://example.com/legal-2",
+        description="Lead data products strategy with analytics, reporting, and stakeholder management",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+
+    product_counsel_score, product_counsel_notes = score_job_fit_v1(product_counsel)
+    data_products_score, data_products_notes = score_job_fit_v1(data_products)
+
+    assert product_counsel_score < 40
+    assert data_products_score < 45
+    assert any("legal_counsel" in note for note in product_counsel_notes)
+    assert any("data_products" in note for note in data_products_notes)
+
+
+def test_paris_ai_research_engineer_is_demoted_not_perfect() -> None:
+    paris_research = DiscoveredJob(
+        provider="greenhouse",
+        external_id="research-1",
+        company="Research Co",
+        title="Paris AI Research Engineer",
+        location="Paris, France",
+        remote=False,
+        apply_url="https://example.com/research-1",
+        description="Machine learning research, research scientist work, distributed systems, and model evaluation",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+
+    score, notes = score_job_fit_v1(paris_research)
+
+    assert score < 100
+    assert score <= 60
+    assert any("ml_research" in note or "senior_research" in note for note in notes)
+
+
+def test_remote_us_backend_api_stays_high() -> None:
+    remote_backend = DiscoveredJob(
+        provider="greenhouse",
+        external_id="backend-1",
+        company="Backend Co",
+        title="Backend/API Engineer",
+        location="Remote - United States",
+        remote=True,
+        apply_url="https://example.com/backend-1",
+        description="Python API microservices backend SQL ETL automation",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+
+    score, notes = score_job_fit_v1(remote_backend)
+
+    assert score >= 70
+    assert any("backend_api" in note for note in notes)
+    assert any("remote" in note for note in notes)
+
+
+def test_canada_only_backend_api_is_demoted_without_canada_allowed() -> None:
+    profile = load_search_profile()
+    restricted_profile = profile.model_copy(update={"allowed_locations": []})
+    canada_backend = DiscoveredJob(
+        provider="greenhouse",
+        external_id="backend-2",
+        company="Backend Co",
+        title="Backend/API Engineer",
+        location="Toronto, Canada",
+        remote=False,
+        apply_url="https://example.com/backend-2",
+        description="Python API microservices backend SQL automation",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+
+    allowed_score, _ = score_job_fit_v1(canada_backend, profile=profile)
+    restricted_score, restricted_notes = score_job_fit_v1(canada_backend, profile=restricted_profile)
+
+    assert restricted_score < allowed_score
+    assert any("Canada-only" in note or "location mismatch" in note for note in restricted_notes)
 
 
 def test_technical_operations_needs_programming_signals() -> None:

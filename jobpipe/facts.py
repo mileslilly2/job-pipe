@@ -15,6 +15,11 @@ ROLE_FAMILY_SCORES = {
     "ai_evaluation": 36,
     "qa_automation": 36,
     "technical_operations": 26,
+    "legal_counsel": -58,
+    "security_only": -44,
+    "ml_research": -48,
+    "senior_research": -52,
+    "data_products": -38,
     "help_desk": -38,
     "customer_support": -38,
     "it_support": -36,
@@ -25,6 +30,11 @@ ROLE_FAMILY_SCORES = {
 }
 
 NEGATIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("legal_counsel", ("product counsel", "legal counsel", "counsel", "corporate counsel", "privacy counsel", "attorney", "lawyer")),
+    ("security_only", ("security engineer", "security analyst", "security operations", "information security", "cybersecurity", "appsec", "secops", "security architect")),
+    ("ml_research", ("ml research", "machine learning research", "research scientist", "applied scientist", "research engineer", "researcher")),
+    ("senior_research", ("senior research", "senior research scientist", "senior research engineer")),
+    ("data_products", ("data products",)),
     ("help_desk", ("help desk", "helpdesk", "service desk", "desk support")),
     ("customer_support", ("customer support", "customer success", "client support", "customer care")),
     ("it_support", ("it support", "technical support", "support engineer", "desktop support", "systems support")),
@@ -239,16 +249,24 @@ def extract_profile_facts(profile: SearchProfile | None) -> ProfileFacts | None:
     if profile is None:
         return None
     role_families = _normalize_terms(profile.target_role_families)
+    excluded_role_families = _normalize_terms(profile.excluded_role_families)
     skills_preferred = _normalize_terms(profile.positive_keywords)
     skills_avoided = _normalize_terms(profile.negative_keywords)
+    preferred_locations = _normalize_terms(profile.preferred_locations)
+    allowed_locations = _normalize_terms(profile.allowed_locations)
+    excluded_locations = _normalize_terms(profile.excluded_locations)
     preferred_work_styles = _normalize_terms(profile.preferred_work_styles)
     preferred_role_levels = _normalize_terms(profile.preferred_role_levels)
     excluded_levels = _normalize_terms(profile.excluded_levels)
     experience_max_years = _profile_experience_cap(preferred_role_levels)
     return ProfileFacts(
         role_families=role_families,
+        excluded_role_families=excluded_role_families,
         skills_preferred=skills_preferred,
         skills_avoided=skills_avoided,
+        preferred_locations=preferred_locations,
+        allowed_locations=allowed_locations,
+        excluded_locations=excluded_locations,
         preferred_work_styles=preferred_work_styles,
         preferred_role_levels=preferred_role_levels,
         excluded_levels=excluded_levels,
@@ -267,8 +285,12 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
     concerns: list[str] = []
     score_adjustment = 0
     profile_role_families = set(profile_facts.role_families)
+    profile_excluded_role_families = set(profile_facts.excluded_role_families)
     profile_preferred_skills = set(profile_facts.skills_preferred)
     profile_avoided_skills = set(profile_facts.skills_avoided)
+    profile_preferred_locations = set(profile_facts.preferred_locations)
+    profile_allowed_locations = set(profile_facts.allowed_locations)
+    profile_excluded_locations = set(profile_facts.excluded_locations)
     profile_work_styles = set(profile_facts.preferred_work_styles)
     profile_preferred_levels = {_normalize_level(level) for level in profile_facts.preferred_role_levels}
     profile_excluded_levels = {_normalize_level(level) for level in profile_facts.excluded_levels}
@@ -276,12 +298,38 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
     if profile_facts.role_families:
         if job_facts.role_family in profile_role_families:
             matched.append(f"role family alignment: {job_facts.role_family}")
-            score_adjustment += 4
+            score_adjustment += 6
         else:
             missing_mismatched.append(
-                f"role family mismatch: {job_facts.role_family} not in {', '.join(profile_facts.role_families)}"
+                f"professional-family conflict: {job_facts.role_family} not in {', '.join(profile_facts.role_families)}"
             )
-            score_adjustment -= 4
+            score_adjustment -= 10
+
+    if profile_excluded_role_families and job_facts.role_family in profile_excluded_role_families:
+        concerns.append(f"professional-family conflict: excluded role family {job_facts.role_family}")
+        score_adjustment -= 20
+
+    location_text = _field(job, 'location')
+    preferred_location_hits = _matching_location_terms(location_text, list(profile_preferred_locations))
+    allowed_location_hits = _matching_location_terms(location_text, list(profile_allowed_locations))
+    excluded_location_hits = _matching_location_terms(location_text, list(profile_excluded_locations))
+    if preferred_location_hits:
+        matched.append(f"location alignment: {', '.join(preferred_location_hits)}")
+        score_adjustment += min(len(preferred_location_hits) * 3, 8)
+    elif allowed_location_hits:
+        matched.append(f"location allowed: {', '.join(allowed_location_hits)}")
+        score_adjustment += min(len(allowed_location_hits) * 2, 4)
+
+    if excluded_location_hits:
+        missing_mismatched.append(f"location mismatch: {', '.join(excluded_location_hits)}")
+        score_adjustment -= 16
+    elif location_text and not job_facts.remote:
+        if _location_is_foreign_onsite(location_text):
+            concerns.append(f"practical-fit concern: foreign onsite location '{location_text}'")
+            score_adjustment -= 12
+        elif _location_mentions_canada(location_text) and not allowed_location_hits:
+            concerns.append(f"practical-fit concern: Canada-only location '{location_text}' not allowed")
+            score_adjustment -= 10
 
     required_matches = [skill for skill in job_facts.skills_required if _matches_any(skill, list(profile_preferred_skills))]
     for skill in required_matches:
@@ -345,6 +393,9 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
         concerns.append(f"support-heavy concern: {job_facts.role_family}")
     if job_facts.role_family in FRONTEND_ROLE_FAMILIES and job_facts.role_family not in profile_role_families:
         concerns.append(f"frontend-heavy concern: {job_facts.role_family}")
+    if _looks_like_infra_role(_job_text(job)) and _requires_deep_distributed_systems(_job_text(job)) and not _has_backend_api_signals(_job_text(job)):
+        concerns.append("practical-fit concern: infra role requires deep distributed systems without strong backend/api signals")
+        score_adjustment -= 10
 
     apply_url = _job_apply_url(job)
     if not apply_url:
@@ -360,6 +411,78 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
         concerns=concerns,
         score_adjustment=score_adjustment,
     )
+
+
+def _matching_location_terms(location: str, terms: list[str]) -> list[str]:
+    matched: list[str] = []
+    for term in terms:
+        if _location_term_matches(location, term):
+            matched.append(term)
+    return matched
+
+
+def _location_term_matches(location: str, term: str) -> bool:
+    normalized_location = _normalize_location(location)
+    normalized_term = _normalize_location(term)
+    if not normalized_location or not normalized_term:
+        return False
+    if normalized_term in {"remote us", "remote united states", "remote usa"}:
+        return _location_is_remote(location) and _location_mentions_us(location)
+    if normalized_term in {"united states", "usa", "us"}:
+        return _location_mentions_us(location)
+    if normalized_term in {"us canada okay", "us canada", "us/canada okay", "north america"}:
+        return _location_mentions_us(location) or _location_mentions_canada(location)
+    if normalized_term in {"canada", "canada only"}:
+        return _location_mentions_canada(location)
+    if normalized_term in {"uk", "united kingdom", "uk only"}:
+        return any(term in normalized_location for term in ("uk", "united kingdom", "london", "britain", "british"))
+    if normalized_term in {"europe", "europe only"}:
+        return any(term in normalized_location for term in ("europe", "european union", "eu", "paris", "dublin", "berlin", "amsterdam", "madrid", "frankfurt"))
+    if normalized_term in {"paris", "london", "dublin", "sydney"}:
+        return normalized_term in normalized_location
+    return normalized_term in normalized_location
+
+
+def _location_is_remote(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("remote", "work from home", "wfh", "fully remote"))
+
+
+def _location_mentions_us(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("united states", "usa", "u s a", "us based", "us only", "remote us", "us remote")) or re.search(r"\bus\b", normalized) is not None
+
+
+def _location_mentions_canada(location: str) -> bool:
+    normalized = _normalize_location(location)
+    return any(term in normalized for term in ("canada", "toronto", "vancouver", "montreal", "calgary", "ottawa", "waterloo"))
+
+
+def _location_is_foreign_onsite(location: str) -> bool:
+    if _location_is_remote(location):
+        return False
+    normalized = _normalize_location(location)
+    if _location_mentions_us(location) or _location_mentions_canada(location):
+        return False
+    return any(term in normalized for term in ("paris", "london", "dublin", "sydney", "uk", "united kingdom", "europe", "france", "germany", "spain", "netherlands", "ireland", "australia"))
+
+
+def _looks_like_infra_role(text: str) -> bool:
+    normalized = _normalize_location(text)
+    return any(term in normalized for term in ("devops", "site reliability", "sre", "platform operations", "release engineer", "systems engineer", "technical operations", "ops engineer", "infrastructure engineer"))
+
+
+def _has_backend_api_signals(text: str) -> bool:
+    return any(_has_phrase(text, phrase) for phrase in ("backend", "api", "microservices", "services", "platform engineer"))
+
+
+def _requires_deep_distributed_systems(text: str) -> bool:
+    return any(_has_phrase(text, phrase) for phrase in ("distributed systems", "distributed system", "high scale", "large scale", "infrastructure", "infra", "platform", "service mesh", "sharding", "replication"))
+
+
+def _normalize_location(value: str) -> str:
+    cleaned = "".join(char.lower() if char.isalnum() else " " for char in value)
+    return " ".join(cleaned.split())
 
 
 def _extract_skills(text: str) -> tuple[list[str], list[str]]:

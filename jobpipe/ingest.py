@@ -33,6 +33,11 @@ NEGATIVE_ROLE_FAMILIES = {
     "sales",
     "clinical_admin",
     "manager",
+    "legal_counsel",
+    "security_only",
+    "ml_research",
+    "senior_research",
+    "data_products",
 }
 
 DEFAULT_EXCLUDE_KEYWORDS = [

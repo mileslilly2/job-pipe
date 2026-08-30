@@ -37,6 +37,7 @@ include = ["jobpipe*"]
 jobpipe = [
   "profile.md",
   "data/*.yaml",
+  "data/knowledge.yaml",
   "data/profiles/*.yaml",
   "role_packs/*.yaml",
   "templates/*.j2",

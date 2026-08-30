@@ -83,9 +83,17 @@ class RolePack(BaseModel):
 
 class SearchProfile(BaseModel):
     name: str
+    active_goal: str | None = None
+    preferred: list[str] = Field(default_factory=list)
+    acceptable: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
     target_role_families: list[str] = Field(default_factory=list)
+    excluded_role_families: list[str] = Field(default_factory=list)
     positive_keywords: list[str] = Field(default_factory=list)
     negative_keywords: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    allowed_locations: list[str] = Field(default_factory=list)
+    excluded_locations: list[str] = Field(default_factory=list)
     preferred_work_styles: list[str] = Field(default_factory=list)
     preferred_role_levels: list[str] = Field(default_factory=list)
     excluded_levels: list[str] = Field(default_factory=list)
@@ -102,8 +110,12 @@ class JobFacts(BaseModel):
 
 class ProfileFacts(BaseModel):
     role_families: list[str] = Field(default_factory=list)
+    excluded_role_families: list[str] = Field(default_factory=list)
     skills_preferred: list[str] = Field(default_factory=list)
     skills_avoided: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    allowed_locations: list[str] = Field(default_factory=list)
+    excluded_locations: list[str] = Field(default_factory=list)
     preferred_work_styles: list[str] = Field(default_factory=list)
     preferred_role_levels: list[str] = Field(default_factory=list)
     excluded_levels: list[str] = Field(default_factory=list)

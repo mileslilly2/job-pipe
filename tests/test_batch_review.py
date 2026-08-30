@@ -69,8 +69,8 @@ def test_batch_review_processes_save_package_apply_and_skip_paths(initialized_wo
     assert apply_application["followup_at"] is not None
     assert skip_application["status"] == "saved"
 
-    package_dir = Path(f"applications/{slugify('Beta Labs')}-{slugify('Automation Engineer')}")
-    apply_dir = Path(f"applications/{slugify('Gamma Systems')}-{slugify('Support Engineer')}")
+    package_dir = Path(f"applications/{slugify('Beta Labs')}-{slugify('Automation Engineer')}-job-{package_id}")
+    apply_dir = Path(f"applications/{slugify('Gamma Systems')}-{slugify('Support Engineer')}-job-{apply_id}")
     for directory in [package_dir, apply_dir]:
         assert (directory / "job.md").exists()
         assert (directory / "fit.md").exists()

@@ -23,7 +23,7 @@ def test_package_creates_deterministic_bundle(initialized_workspace, runner) -> 
     result = runner.invoke(app, ["package", str(job_id)])
     assert result.exit_code == 0, result.stdout
 
-    package_dir = Path("applications/acme-co-python-automation-engineer")
+    package_dir = Path(f"applications/acme-co-python-automation-engineer-job-{job_id}")
     job_md = package_dir / "job.md"
     fit_md = package_dir / "fit.md"
     resume_md = package_dir / "resume-tailored.md"
@@ -72,3 +72,31 @@ def test_package_requires_saved_job(initialized_workspace, runner) -> None:
     result = runner.invoke(app, ["package", str(job_id)])
     assert result.exit_code != 0
     assert "Run save before package." in result.stdout or "Run save before package." in result.stderr
+
+def test_package_directory_includes_job_id_to_avoid_collisions(initialized_workspace, runner) -> None:
+    shared_payload = {
+        "provider": "greenhouse",
+        "company": "Same Co",
+        "title": "Python Automation Engineer",
+        "location": "Remote - United States",
+        "remote": True,
+        "apply_url": "https://example.com/apply",
+        "description": "Build Python automation pipelines with API integrations, SQL, SQLite, ETL, CLI tools, and testing.",
+    }
+    first_id = insert_job({**shared_payload, "external_id": "package-collision-1"}, review_status="new")
+    second_id = insert_job({**shared_payload, "external_id": "package-collision-2"}, review_status="new")
+
+    assert runner.invoke(app, ["save", str(first_id)]).exit_code == 0
+    assert runner.invoke(app, ["save", str(second_id)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(first_id)]).exit_code == 0
+    assert runner.invoke(app, ["package", str(second_id)]).exit_code == 0
+
+    first_dir = Path(f"applications/same-co-python-automation-engineer-job-{first_id}")
+    second_dir = Path(f"applications/same-co-python-automation-engineer-job-{second_id}")
+
+    assert first_dir != second_dir
+    assert (first_dir / "job.md").exists()
+    assert (second_dir / "job.md").exists()
+    assert f"Run `jobpipe status {first_id} applied`" in (first_dir / "apply.md").read_text(encoding="utf-8")
+    assert f"Run `jobpipe status {second_id} applied`" in (second_dir / "apply.md").read_text(encoding="utf-8")
+

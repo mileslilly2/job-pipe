@@ -274,10 +274,28 @@ def test_analytics_page_and_browser_actions(client: TestClient, monkeypatch: pyt
 
     open_package = client.post(f"/jobs/{job_id}/open-package?next=/jobs/{job_id}", follow_redirects=False)
     assert open_package.status_code == 303
-    assert opened_paths and opened_paths[0].endswith("applications/browser-co-python-automation-engineer")
+    assert opened_paths and opened_paths[0].endswith(f"applications/browser-co-python-automation-engineer-job-{job_id}")
 
     copy_cover = client.post(f"/jobs/{job_id}/copy-cover-note?next=/jobs/{job_id}", follow_redirects=False)
     assert copy_cover.status_code == 303
     copy_resume = client.post(f"/jobs/{job_id}/copy-resume-text?next=/jobs/{job_id}", follow_redirects=False)
     assert copy_resume.status_code == 303
     assert copied == ["cover-note.md", "resume-tailored.md"]
+
+def test_jobs_show_archived_and_ignored_when_explicit(client: TestClient) -> None:
+    archived_job = insert_job(_job_payload("Archived Co", "Platform Engineer", external_id="job-archived"), review_status="new")
+    ignored_job = insert_job(_job_payload("Ignored Co", "Backend Engineer", external_id="job-ignored"), review_status="new")
+
+    update_status(archived_job, "archived")
+    update_status(ignored_job, "ignored")
+
+    archived_page = client.get("/jobs", params={"status": "archived"})
+    assert archived_page.status_code == 200
+    assert "Archived Co" in archived_page.text
+    assert "Ignored Co" not in archived_page.text
+
+    ignored_page = client.get("/jobs", params={"status": "ignored"})
+    assert ignored_page.status_code == 200
+    assert "Ignored Co" in ignored_page.text
+    assert "Archived Co" not in ignored_page.text
+

@@ -83,7 +83,15 @@ def applications_dir() -> Path:
 
 
 def package_directory_for_job(job: dict[str, Any]) -> Path:
-    return applications_dir() / f"{slugify(job.get('company') or 'unknown-company')}-{slugify(job.get('title') or 'unknown-title')}"
+    company = slugify(job.get("company") or "unknown-company")
+    title = slugify(job.get("title") or "unknown-title")
+    job_id = job.get("id")
+    if job_id is not None and str(job_id).strip():
+        suffix = f"-job-{job_id}"
+    else:
+        external_id = slugify(job.get("external_id") or "")
+        suffix = f"-{external_id}" if external_id else ""
+    return applications_dir() / f"{company}-{title}{suffix}"
 
 
 def application_package_paths(job: dict[str, Any]) -> ApplicationPackagePaths:

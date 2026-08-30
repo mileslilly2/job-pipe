@@ -97,6 +97,10 @@
     <h3>Profile facts</h3>
     {% if fact_report.profile %}
     <div><strong>Target role families:</strong> {{ fact_report.profile.role_families | join(", ") if fact_report.profile.role_families else "None" }}</div>
+    <div><strong>Excluded role families:</strong> {{ fact_report.profile.excluded_role_families | join(", ") if fact_report.profile.excluded_role_families else "None" }}</div>
+    <div><strong>Preferred locations:</strong> {{ fact_report.profile.preferred_locations | join(", ") if fact_report.profile.preferred_locations else "None" }}</div>
+    <div><strong>Allowed locations:</strong> {{ fact_report.profile.allowed_locations | join(", ") if fact_report.profile.allowed_locations else "None" }}</div>
+    <div><strong>Excluded locations:</strong> {{ fact_report.profile.excluded_locations | join(", ") if fact_report.profile.excluded_locations else "None" }}</div>
     <div><strong>Preferred skills:</strong> {{ fact_report.profile.skills_preferred | join(", ") if fact_report.profile.skills_preferred else "None" }}</div>
     <div><strong>Avoided skills:</strong> {{ fact_report.profile.skills_avoided | join(", ") if fact_report.profile.skills_avoided else "None" }}</div>
     <div><strong>Preferred work styles:</strong> {{ fact_report.profile.preferred_work_styles | join(", ") if fact_report.profile.preferred_work_styles else "None" }}</div>

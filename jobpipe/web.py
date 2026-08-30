@@ -380,7 +380,7 @@ def _filter_jobs(
 ) -> list[dict[str, Any]]:
     filtered = jobs
     needle = status.strip().lower() if status else ""
-    if active_only and needle not in {"rejected", "skipped"}:
+    if active_only and needle not in {"rejected", "skipped", "archived", "ignored"}:
         filtered = [job for job in filtered if job.get("bucket") in ACTIVE_BUCKETS]
     if needle:
         filtered = [job for job in filtered if _job_matches_status(job, needle)]

@@ -48,6 +48,7 @@ app = typer.Typer(help="Application cockpit for repetitive job applications.")
 profiles_app = typer.Typer(help="Manage search profiles.")
 sources_app = typer.Typer(help="Manage configured job sources.")
 console = Console()
+ALLOWED_FEEDBACK_ACTIONS = {"saved", "skipped", "packaged", "applied"}
 
 
 def _env() -> Environment:
@@ -77,6 +78,7 @@ def _package_assets() -> list[tuple[Path, Path]]:
         (pkg / "data" / "job_sources.yaml", root_dir() / "data" / "job_sources.yaml"),
         (pkg / "data" / "search_profiles.yaml", root_dir() / "data" / "search_profiles.yaml"),
         (pkg / "data" / "source_packs.yaml", root_dir() / "data" / "source_packs.yaml"),
+        (pkg / "data" / "knowledge.yaml", root_dir() / "data" / "knowledge.yaml"),
         (pkg / "role_packs" / "helpdesk.yaml", root_dir() / "role_packs" / "helpdesk.yaml"),
         (pkg / "role_packs" / "technical_support.yaml", root_dir() / "role_packs" / "technical_support.yaml"),
         (pkg / "role_packs" / "junior_dev.yaml", root_dir() / "role_packs" / "junior_dev.yaml"),
@@ -229,6 +231,10 @@ def _print_job_details(job_row, profile=None) -> None:
         profile_facts.add_column("Value")
         profile_data = fact_report.profile
         profile_facts.add_row("Target role families", ", ".join(profile_data.role_families) or "None")
+        profile_facts.add_row("Excluded role families", ", ".join(profile_data.excluded_role_families) or "None")
+        profile_facts.add_row("Preferred locations", ", ".join(profile_data.preferred_locations) or "None")
+        profile_facts.add_row("Allowed locations", ", ".join(profile_data.allowed_locations) or "None")
+        profile_facts.add_row("Excluded locations", ", ".join(profile_data.excluded_locations) or "None")
         profile_facts.add_row("Preferred skills", ", ".join(profile_data.skills_preferred) or "None")
         profile_facts.add_row("Avoided skills", ", ".join(profile_data.skills_avoided) or "None")
         profile_facts.add_row("Preferred work styles", ", ".join(profile_data.preferred_work_styles) or "None")
@@ -1185,8 +1191,14 @@ def feedback_command(
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
-    
-    insert_feedback(job_id, action, reason, note)
+
+    normalized_action = action.strip().lower()
+    if normalized_action not in ALLOWED_FEEDBACK_ACTIONS:
+        raise typer.BadParameter(
+            f"Unsupported feedback action: {action!r}. Choose one of: {', '.join(sorted(ALLOWED_FEEDBACK_ACTIONS))}."
+        )
+
+    insert_feedback(job_id, normalized_action, reason, note)
     sync_weights()
     console.print(f"Recorded feedback for job {job_id}.")
 

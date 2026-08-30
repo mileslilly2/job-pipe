@@ -8,6 +8,26 @@
     - qa_automation
     - ai_evaluation
     - technical_operations
+  excluded_role_families:
+    - legal_counsel
+    - security_only
+    - ml_research
+    - senior_research
+    - data_products
+  preferred_locations:
+    - Remote US
+    - United States
+    - US/Canada okay
+  allowed_locations:
+    - Canada
+  excluded_locations:
+    - Paris
+    - London
+    - Dublin
+    - Sydney
+    - UK-only
+    - Canada-only
+    - Europe-only
   positive_keywords:
     - python
     - sql

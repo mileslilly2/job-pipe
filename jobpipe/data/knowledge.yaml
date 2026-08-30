@@ -1,0 +1,193 @@
+match_weights:
+  exact: 8
+  alias: 6
+  related: 3
+  conflict: -12
+  preferred_role_family: 4
+  preferred_concept: 2
+
+concepts:
+  automation:
+    aliases:
+      - automation
+      - workflow automation
+      - internal tooling
+      - internal tools
+      - tooling
+    related:
+      - backend_api
+      - qa_automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - python_automation
+      - technical_operations
+  backend_api:
+    aliases:
+      - backend api
+      - backend engineer
+      - backend developer
+      - api
+      - microservices
+      - internal tooling
+      - internal tools
+    related:
+      - automation
+      - data_engineering
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - backend_api
+  data_engineering:
+    aliases:
+      - data engineering
+      - data pipeline
+      - data pipelines
+      - pipelines
+      - etl
+      - warehouse
+    related:
+      - backend_api
+      - automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - data_engineer
+  qa_automation:
+    aliases:
+      - qa automation
+      - test automation
+      - sdet
+      - playwright
+      - pytest
+    related:
+      - automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - qa_automation
+  ai_evaluation:
+    aliases:
+      - ai evaluation
+      - model evaluation
+      - evals
+      - evaluation engineer
+    related:
+      - automation
+    role_families:
+      - ai_evaluation
+  help_desk:
+    aliases:
+      - help desk
+      - helpdesk
+      - service desk
+      - desk support
+    conflicts:
+      - automation
+      - backend_api
+      - data_engineering
+      - qa_automation
+      - ai_evaluation
+    role_families:
+      - help_desk
+  customer_support:
+    aliases:
+      - customer support
+      - customer success
+      - client support
+      - customer care
+    conflicts:
+      - automation
+      - backend_api
+      - data_engineering
+      - qa_automation
+      - ai_evaluation
+    role_families:
+      - customer_support
+  python:
+    aliases:
+      - python
+      - python scripting
+    related:
+      - automation
+      - backend_api
+      - data_engineering
+    role_families:
+      - python_automation
+      - backend_api
+      - data_engineer
+  sql:
+    aliases:
+      - sql
+    related:
+      - data_engineering
+    role_families:
+      - data_engineer
+  etl:
+    aliases:
+      - etl
+    related:
+      - data_engineering
+    role_families:
+      - data_engineer
+  cli:
+    aliases:
+      - cli
+      - command line
+      - command-line
+    related:
+      - automation
+    role_families:
+      - python_automation
+  debugging:
+    aliases:
+      - debugging
+      - troubleshooting
+    related:
+      - automation
+    role_families:
+      - python_automation
+  documentation:
+    aliases:
+      - documentation
+      - docs
+      - knowledge base
+    related:
+      - customer_support
+    role_families:
+      - technical_operations
+
+profiles:
+  miles:
+    preferred_concepts:
+      - automation
+      - backend_api
+      - data_engineering
+      - qa_automation
+      - ai_evaluation
+      - python
+      - sql
+      - etl
+      - debugging
+      - documentation
+      - cli
+    avoided_concepts:
+      - help_desk
+      - customer_support
+    preferred_role_families:
+      - python_automation
+      - backend_api
+      - data_engineer
+      - qa_automation
+      - ai_evaluation
+      - technical_operations
+    avoided_role_families:
+      - help_desk
+      - customer_support
+      - sales
+      - clinical_admin
+      - manager

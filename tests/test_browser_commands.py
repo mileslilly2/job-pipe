@@ -33,6 +33,6 @@ def test_browser_open_opens_folder_url_and_copies_requested_files(initialized_wo
     result = runner.invoke(app, ["browser-open", str(job_id), "--copy", "resume", "--copy", "cover-note"])
     assert result.exit_code == 0, result.stdout
     assert opened_urls == ["https://example.com/apply"]
-    assert opened_paths and opened_paths[0].endswith("applications/acme-co-python-automation-engineer")
+    assert opened_paths and opened_paths[0].endswith(f"applications/acme-co-python-automation-engineer-job-{job_id}")
     assert copied == ["resume-tailored.md", "cover-note.md"]
     assert "Copied to clipboard" in result.stdout

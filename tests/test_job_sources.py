@@ -407,6 +407,10 @@ def test_search_profile_miles_loaded_from_packaged_data() -> None:
     profile = load_search_profile("miles", Path("jobpipe/data/search_profiles.yaml"))
     assert profile.name == "miles"
     assert "data_engineer" in profile.target_role_families
+    assert "legal_counsel" in profile.excluded_role_families
+    assert "remote us" in profile.preferred_locations
+    assert "canada" in profile.allowed_locations
+    assert "paris" in profile.excluded_locations
     assert "remote" in profile.preferred_work_styles
     assert "hybrid" in profile.preferred_work_styles
     assert "senior" in profile.excluded_levels
@@ -449,6 +453,57 @@ def test_sources_add_rejects_duplicate_source_identity(initialized_workspace, ru
     assert second.exit_code != 0
     content = Path("data/job_sources.yaml").read_text(encoding="utf-8")
     assert content.count("company: Duplicate Co") == 1
+
+
+def test_profile_aware_filtering_excludes_non_target_role_families() -> None:
+    source = JobSource(
+        provider="greenhouse",
+        company="Acme",
+        company_slug="acme",
+        board_token="acme",
+        target_role_families=["backend_api", "data_engineer"],
+        enabled=True,
+    )
+    profile = load_search_profile()
+    jobs = [
+        DiscoveredJob(
+            provider="greenhouse",
+            external_id="legal",
+            company="Acme",
+            title="Product Counsel",
+            location="Paris, France",
+            remote=False,
+            apply_url="https://example.com/legal",
+            description="Counsel for product and platform teams with backend APIs",
+            posted_at="2026-06-22T00:00:00+00:00",
+        ),
+        DiscoveredJob(
+            provider="greenhouse",
+            external_id="data-products",
+            company="Acme",
+            title="Data Products",
+            location="London, UK",
+            remote=False,
+            apply_url="https://example.com/data-products",
+            description="Lead data products strategy with analytics and reporting",
+            posted_at="2026-06-22T00:00:00+00:00",
+        ),
+        DiscoveredJob(
+            provider="greenhouse",
+            external_id="good",
+            company="Acme",
+            title="Junior Data Engineer",
+            location="Remote",
+            remote=True,
+            apply_url="https://example.com/good",
+            description="Python SQL ETL backend API",
+            posted_at="2026-06-22T00:00:00+00:00",
+        ),
+    ]
+
+    filtered = filter_discovered_jobs(jobs, source, profile)
+
+    assert [job.external_id for job in filtered] == ["good"]
 
 
 def test_profile_aware_filtering_excludes_excluded_levels() -> None:

@@ -37,7 +37,7 @@ def test_apply_flow_auto_generates_package_and_marks_applied(initialized_workspa
     result = runner.invoke(app, ["apply-flow", str(job_id)], input="y\n")
     assert result.exit_code == 0, result.stdout
 
-    package_dir = Path("applications/acme-co-python-automation-engineer")
+    package_dir = Path(f"applications/acme-co-python-automation-engineer-job-{job_id}")
     assert (package_dir / "job.md").exists()
     assert (package_dir / "fit.md").exists()
     assert (package_dir / "resume-tailored.md").exists()
