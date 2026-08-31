@@ -173,6 +173,8 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
     notes: list[str] = ["base score: 10"]
 
     family, family_matches, family_reason = _classify_role_family(job)
+    if isinstance(job, dict) and job.get("primary_role_family"):
+        family = str(job["primary_role_family"]); family_matches = ["persisted classification"]; family_reason = "persisted primary role family"
     notes.append(f"role family: {family}")
     if family_matches:
         notes.append("matched role signals: " + ", ".join(family_matches))

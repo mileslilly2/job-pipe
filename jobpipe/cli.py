@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 import typer
@@ -13,10 +14,12 @@ from .application_package import application_package_paths, build_application_pa
 from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, save_search_profiles, source_identity, source_identity_label
 from .facts import build_fact_report
 from .classify import classify_job, detect_seniority
+from .classification import classify_job as classify_canonical_job
 from .db import (
     get_analysis,
     get_application,
     get_job,
+    get_classification,
     get_job_by_provider_external_id,
     init_database,
     insert_feedback,
@@ -28,6 +31,7 @@ from .db import (
     shortlist_jobs,
     update_job,
     upsert_analysis,
+    upsert_classification,
     upsert_packet_paths,
 )
 from .export import export_tracker_csv
@@ -542,6 +546,30 @@ def list_command() -> None:
     console.print(table)
 
 
+@app.command("classify")
+def classify(job_id: int | None = typer.Option(None, "--job-id"), force: bool = False) -> None:
+    _ensure_workspace()
+    rows = [get_job(job_id)] if job_id is not None else db_list_jobs()
+    classified = unchanged = unknown = 0
+    counts = Counter(); seniorities = Counter()
+    for row in rows:
+        if row is None or (job_id is None and str(row["status"] or "") in {"skipped", "rejected", "archived", "ignored"}):
+            continue
+        existing = get_classification(int(row["id"]))
+        if existing is not None and existing["provenance"] == "manual" and not force:
+            unchanged += 1; counts[existing["primary_role_family"]] += 1; seniorities[existing["seniority"]] += 1; continue
+        result = classify_canonical_job(_row_to_job(row))
+        if existing is not None and existing["primary_role_family"] == result.primary_role_family and existing["seniority"] == result.seniority:
+            unchanged += 1
+        else:
+            upsert_classification(int(row["id"]), result); classified += 1
+        unknown += result.primary_role_family == "other"
+        counts[result.primary_role_family] += 1; seniorities[result.seniority] += 1
+    console.print(f"Classification: {classified} classified, {unchanged} unchanged, {unknown} unknown or other")
+    console.print("Role families: " + ", ".join(f"{name}={count}" for name, count in counts.most_common()))
+    console.print("Seniority: " + ", ".join(f"{name}={count}" for name, count in seniorities.most_common()))
+
+
 @app.command("analyze")
 def analyze(job_id: int) -> None:
     _ensure_workspace()
@@ -549,12 +577,20 @@ def analyze(job_id: int) -> None:
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
     job = _row_to_job(row)
+    persisted = get_classification(job_id)
+    if persisted is None or persisted["provenance"] != "manual":
+        canonical = classify_canonical_job(job)
+        upsert_classification(job_id, canonical)
+        persisted = get_classification(job_id)
     candidate = _load_candidate()
     packs = _load_role_packs()
     role_type, matched_keywords, missing_keywords = classify_job(job, packs)
     pack = packs.get(role_type)
     risk_score, red_flags = score_risk(job, pack)
     seniority, eligibility_flags = detect_seniority(job, risk_score=risk_score, risk_flags=red_flags)
+    if persisted is not None:
+        seniority = persisted["seniority"] or seniority
+        role_type = persisted["primary_role_family"] or role_type
     active_profile = _load_active_profile()
     display_fit_score, display_fit_notes = score_job_fit_v1(job, profile=active_profile)
     fit_score, fit_notes = score_fit(job, role_type, seniority, pack, candidate, matched_keywords, profile=active_profile)

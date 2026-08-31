@@ -50,6 +50,20 @@
   </div>
 
   <div class="card stack">
+    <h3>Classification</h3>
+    {% if classification %}
+    <div><strong>Primary role family:</strong> {{ classification.primary_role_family }}</div>
+    <div><strong>Secondary role families:</strong> {{ classification.secondary_role_families | join(", ") if classification.secondary_role_families else "None" }}</div>
+    <div><strong>Seniority:</strong> {{ classification.seniority }}</div>
+    <div><strong>Provenance:</strong> {{ classification.provenance }}</div>
+    <div><strong>Role evidence:</strong> {{ classification.role_evidence | join("; ") if classification.role_evidence else "None" }}</div>
+    <div><strong>Seniority evidence:</strong> {{ classification.seniority_evidence | join("; ") if classification.seniority_evidence else "None" }}</div>
+    {% else %}
+    <div class="muted">Classification not available.</div>
+    {% endif %}
+  </div>
+
+  <div class="card stack">
     <h3>Scoring</h3>
     {% if analysis %}
     <div><strong>Role type:</strong> {{ analysis.role_type }}</div>

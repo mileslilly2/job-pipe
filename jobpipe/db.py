@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .catalog import load_search_profile
+from .classification import classify_job as classify_canonical_job
 from .score import score_job_fit_v1
 from .utils import db_path, dump_json, ensure_dir, now_iso
 
@@ -53,6 +54,18 @@ CREATE TABLE IF NOT EXISTS job_analysis (
     eligibility_flags_json TEXT,
     notes TEXT,
     created_at TEXT NOT NULL,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+
+CREATE TABLE IF NOT EXISTS job_classifications (
+    job_id INTEGER PRIMARY KEY,
+    primary_role_family TEXT NOT NULL,
+    secondary_role_families_json TEXT NOT NULL DEFAULT "[]",
+    seniority TEXT NOT NULL,
+    role_evidence_json TEXT NOT NULL DEFAULT "[]",
+    seniority_evidence_json TEXT NOT NULL DEFAULT "[]",
+    provenance TEXT NOT NULL DEFAULT "deterministic",
+    updated_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 
@@ -248,7 +261,10 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
             """,
             (job_id, timestamp, timestamp),
         )
-        return job_id
+    existing = get_classification(job_id)
+    if existing is None or existing["provenance"] != "manual":
+        upsert_classification(job_id, classify_canonical_job(payload))
+    return job_id
 
 
 def update_job(job_id: int, data: dict[str, Any]) -> None:
@@ -288,6 +304,15 @@ def get_job_by_provider_external_id(provider: str, external_id: str) -> sqlite3.
 
 def get_analysis(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM job_analysis WHERE job_id = ?", (job_id,))
+
+
+def get_classification(job_id: int) -> sqlite3.Row | None:
+    return fetch_one("SELECT * FROM job_classifications WHERE job_id = ?", (job_id,))
+
+
+def upsert_classification(job_id: int, classification: Any, provenance: str = "deterministic") -> None:
+    with connect() as conn:
+        conn.execute("""INSERT INTO job_classifications (job_id, primary_role_family, secondary_role_families_json, seniority, role_evidence_json, seniority_evidence_json, provenance, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET primary_role_family=excluded.primary_role_family, secondary_role_families_json=excluded.secondary_role_families_json, seniority=excluded.seniority, role_evidence_json=excluded.role_evidence_json, seniority_evidence_json=excluded.seniority_evidence_json, provenance=excluded.provenance, updated_at=excluded.updated_at""", (job_id, classification.primary_role_family, dump_json(list(classification.secondary_role_families)), classification.seniority, dump_json(list(classification.role_evidence)), dump_json(list(classification.seniority_evidence)), provenance, now_iso()))
 
 
 def get_application(job_id: int) -> sqlite3.Row | None:
@@ -401,11 +426,14 @@ def list_jobs() -> list[sqlite3.Row]:
             jobs.id, jobs.provider, jobs.external_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
             jobs.location, jobs.remote, jobs.posted_at, jobs.discovered_at, jobs.fit_score, jobs.description, jobs.raw_text,
             jobs.status AS review_status,
-            job_analysis.role_type, job_analysis.seniority_level, job_analysis.risk_score, job_analysis.quality_score,
+            job_classifications.primary_role_family AS role_type,
+            job_classifications.primary_role_family AS primary_role_family,
+            job_classifications.seniority AS seniority_level, job_analysis.risk_score, job_analysis.quality_score,
             job_analysis.recommendation, job_analysis.skip_reason,
             applications.status, applications.followup_at
         FROM jobs
         LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
+        LEFT JOIN job_classifications ON job_classifications.job_id = jobs.id
         LEFT JOIN applications ON applications.job_id = jobs.id
         ORDER BY jobs.id ASC
         """

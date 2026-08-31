@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .catalog import load_search_profile
+from .classification import normalize_role_family
 from .application_package import application_package_paths
 from .db import due_followups, fetch_all, list_jobs
 from .learn import load_learned_weights
@@ -76,6 +77,10 @@ def _decorate_jobs(rows, *, profile=None) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     for row in rows:
         job = dict(row)
+        role_type = str(job.get("role_type") or "").strip()
+        if role_type:
+            job["role_type"] = normalize_role_family(role_type)
+            job["primary_role_family"] = job["role_type"]
         score, notes = score_job_fit_v1(job, learned_weights=learned_weights, profile=profile)
         job['score'] = score
         job['score_notes'] = notes

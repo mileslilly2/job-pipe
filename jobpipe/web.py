@@ -13,7 +13,7 @@ from .application_package import application_package_paths, build_application_pa
 from .analytics import build_analytics_report
 from .browser import copy_file, open_path, open_url
 from .catalog import load_search_profile
-from .db import due_followups, fetch_one, get_analysis, get_application, get_job, insert_feedback, list_jobs, set_review_status
+from .db import due_followups, fetch_one, get_analysis, get_application, get_classification, get_job, insert_feedback, list_jobs, set_review_status
 from .facts import build_fact_report
 from .learn import load_learned_weights, sync_weights
 from .score import score_job_fit_v1
@@ -565,6 +565,7 @@ def _job_detail_context(job_id: int) -> dict[str, Any]:
 
     job = dict(row)
     analysis_row = get_analysis(job_id)
+    classification_row = get_classification(job_id)
     application_row = get_application(job_id)
     packet_row = fetch_one("SELECT * FROM application_packets WHERE job_id = ?", (job_id,))
     score, notes = _job_score(job)
@@ -583,12 +584,19 @@ def _job_detail_context(job_id: int) -> dict[str, Any]:
             "package_directory": str(application_package_paths(job).directory),
         },
         "analysis": _analysis_context(analysis_row),
+        "classification": _classification_context(classification_row),
         "application": dict(application_row) if application_row else None,
         "packet": dict(packet_row) if packet_row else None,
         "package_paths": package_paths,
         "learned_adjustments": learned_adjustments,
         "fact_report": fact_report,
     }
+
+
+def _classification_context(row) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return {"primary_role_family": row["primary_role_family"], "secondary_role_families": load_json(row["secondary_role_families_json"]), "seniority": row["seniority"], "role_evidence": load_json(row["role_evidence_json"]), "seniority_evidence": load_json(row["seniority_evidence_json"]), "provenance": row["provenance"]}
 
 
 def _analysis_context(row) -> dict[str, Any] | None:
