@@ -5,30 +5,6 @@ from typing import Any
 
 from .models import FactReport, JobFacts, ProfileFacts, SearchProfile
 
-ROLE_FAMILY_SCORES = {
-    "data_engineer": 44,
-    "python_automation": 40,
-    "backend_api": 38,
-    "frontend_engineer": 34,
-    "software_engineer": 34,
-    "junior_software_engineer": 36,
-    "ai_evaluation": 36,
-    "qa_automation": 36,
-    "technical_operations": 26,
-    "legal_counsel": -58,
-    "security_only": -44,
-    "ml_research": -48,
-    "senior_research": -52,
-    "data_products": -38,
-    "help_desk": -38,
-    "customer_support": -38,
-    "it_support": -36,
-    "sales": -40,
-    "clinical_admin": -34,
-    "manager": -44,
-    "unknown": 0,
-}
-
 NEGATIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("legal_counsel", ("product counsel", "legal counsel", "counsel", "corporate counsel", "privacy counsel", "attorney", "lawyer")),
     ("security_only", ("security engineer", "security analyst", "security operations", "information security", "cybersecurity", "appsec", "secops", "security architect")),
@@ -37,7 +13,9 @@ NEGATIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("data_products", ("data products",)),
     ("help_desk", ("help desk", "helpdesk", "service desk", "desk support")),
     ("customer_support", ("customer support", "customer success", "client support", "customer care")),
-    ("it_support", ("it support", "technical support", "support engineer", "desktop support", "systems support")),
+    ("technical_support", ("it support", "technical support", "support engineer", "desktop support", "systems support")),
+    ("physician", ("physician", "medical doctor", "doctor", "surgeon")),
+    ("truck_driver", ("truck driver", "cdl driver", "commercial driver")),
     ("sales", ("business development", "account executive", "sales", "sdr", "bdr", "solutions consultant")),
     ("clinical_admin", ("clinical", "nurse", "patient", "medical assistant", "healthcare", "administrative")),
     ("manager", ("engineering manager", "product manager", "project manager", "program manager", "manager", "director", "head of")),
@@ -248,8 +226,9 @@ def extract_job_facts(job: Any) -> JobFacts:
 def extract_profile_facts(profile: SearchProfile | None) -> ProfileFacts | None:
     if profile is None:
         return None
-    role_families = _normalize_terms(profile.target_role_families)
-    excluded_role_families = _normalize_terms(profile.excluded_role_families)
+    preferred_role_families = _normalize_terms(profile.preferred)
+    acceptable_role_families = _normalize_terms(profile.acceptable)
+    avoid_role_families = _normalize_terms(profile.avoid)
     skills_preferred = _normalize_terms(profile.positive_keywords)
     skills_avoided = _normalize_terms(profile.negative_keywords)
     preferred_locations = _normalize_terms(profile.preferred_locations)
@@ -260,8 +239,9 @@ def extract_profile_facts(profile: SearchProfile | None) -> ProfileFacts | None:
     excluded_levels = _normalize_terms(profile.excluded_levels)
     experience_max_years = _profile_experience_cap(preferred_role_levels)
     return ProfileFacts(
-        role_families=role_families,
-        excluded_role_families=excluded_role_families,
+        preferred_role_families=preferred_role_families,
+        acceptable_role_families=acceptable_role_families,
+        avoid_role_families=avoid_role_families,
         skills_preferred=skills_preferred,
         skills_avoided=skills_avoided,
         preferred_locations=preferred_locations,
@@ -284,8 +264,9 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
     missing_mismatched: list[str] = []
     concerns: list[str] = []
     score_adjustment = 0
-    profile_role_families = set(profile_facts.role_families)
-    profile_excluded_role_families = set(profile_facts.excluded_role_families)
+    profile_preferred_role_families = set(profile_facts.preferred_role_families)
+    profile_acceptable_role_families = set(profile_facts.acceptable_role_families)
+    profile_avoid_role_families = set(profile_facts.avoid_role_families)
     profile_preferred_skills = set(profile_facts.skills_preferred)
     profile_avoided_skills = set(profile_facts.skills_avoided)
     profile_preferred_locations = set(profile_facts.preferred_locations)
@@ -295,18 +276,13 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
     profile_preferred_levels = {_normalize_level(level) for level in profile_facts.preferred_role_levels}
     profile_excluded_levels = {_normalize_level(level) for level in profile_facts.excluded_levels}
 
-    if profile_facts.role_families:
-        if job_facts.role_family in profile_role_families:
-            matched.append(f"role family alignment: {job_facts.role_family}")
-            score_adjustment += 6
-        else:
-            missing_mismatched.append(
-                f"professional-family conflict: {job_facts.role_family} not in {', '.join(profile_facts.role_families)}"
-            )
-            score_adjustment -= 10
-
-    if profile_excluded_role_families and job_facts.role_family in profile_excluded_role_families:
-        concerns.append(f"professional-family conflict: excluded role family {job_facts.role_family}")
+    if job_facts.role_family in profile_preferred_role_families:
+        matched.append(f"role preference: preferred {job_facts.role_family} (+6)")
+        score_adjustment += 6
+    elif job_facts.role_family in profile_acceptable_role_families:
+        matched.append(f"role preference: acceptable {job_facts.role_family} (+0)")
+    if job_facts.role_family in profile_avoid_role_families:
+        concerns.append(f"role preference: avoid {job_facts.role_family} (-20)")
         score_adjustment -= 20
 
     location_text = _field(job, 'location')
@@ -347,10 +323,6 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
         if _matches_any(skill, list(profile_preferred_skills)):
             matched.append(f"preferred skill match: {skill}")
             score_adjustment += 1
-        else:
-            missing_mismatched.append(f"preferred skill missing from profile: {skill}")
-            score_adjustment -= 1
-
     avoided_skill_hits = [skill for skill in job_facts.skills_required + job_facts.skills_preferred if _matches_any(skill, list(profile_avoided_skills))]
     if avoided_skill_hits:
         avoided = sorted(set(avoided_skill_hits))
@@ -379,20 +351,11 @@ def build_fact_report(job: Any, profile: SearchProfile | None = None) -> FactRep
                 f"experience mismatch: job asks for {job_facts.experience_min_years}+ years, profile targets up to {profile_facts.experience_max_years} years"
             )
             score_adjustment -= min(6 + gap * 2, 14)
-        else:
-            matched.append(
-                f"experience alignment: job asks for {job_facts.experience_min_years}+ years, profile targets up to {profile_facts.experience_max_years} years"
-            )
-            score_adjustment += 2
 
     if job_facts.seniority in {"senior", "staff", "principal", "manager"}:
         concerns.append(f"seniority concern: {job_facts.seniority}")
         score_adjustment -= 4 if job_facts.seniority == "senior" else 6
 
-    if job_facts.role_family in SUPPORT_ROLE_FAMILIES and job_facts.role_family not in profile_role_families:
-        concerns.append(f"support-heavy concern: {job_facts.role_family}")
-    if job_facts.role_family in FRONTEND_ROLE_FAMILIES and job_facts.role_family not in profile_role_families:
-        concerns.append(f"frontend-heavy concern: {job_facts.role_family}")
     if _looks_like_infra_role(_job_text(job)) and _requires_deep_distributed_systems(_job_text(job)) and not _has_backend_api_signals(_job_text(job)):
         concerns.append("practical-fit concern: infra role requires deep distributed systems without strong backend/api signals")
         score_adjustment -= 10

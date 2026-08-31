@@ -38,8 +38,16 @@ class KnowledgeProfile:
 
 
 @dataclass(frozen=True)
+class GoalDefinition:
+    name: str
+    label: str
+    description: str
+
+
+@dataclass(frozen=True)
 class KnowledgeCatalog:
     concepts: dict[str, KnowledgeConcept] = field(default_factory=dict)
+    goals: dict[str, GoalDefinition] = field(default_factory=dict)
     profiles: dict[str, KnowledgeProfile] = field(default_factory=dict)
     weights: KnowledgeWeights = field(default_factory=KnowledgeWeights)
 
@@ -60,6 +68,7 @@ class KnowledgeReport:
     conflict_penalties: list[str] = field(default_factory=list)
     score_adjustment: int = 0
     goal_modifier: int = 0
+    goal_label: str | None = None
     goal_notes: list[str] = field(default_factory=list)
 
     @property
@@ -105,20 +114,25 @@ def load_knowledge(path: Path | None = None) -> KnowledgeCatalog:
     raw = _load_raw_knowledge(actual)
     return KnowledgeCatalog(
         concepts=_parse_concepts(raw.get("concepts", {})),
+        goals=_parse_goals(raw.get("goals", {})),
         profiles=_parse_profiles(raw.get("profiles", {})),
         weights=_parse_weights(raw.get("match_weights", {})),
     )
 
 
-GOAL_DESCRIPTIONS = {
-    "career_acceleration": "career acceleration",
-    "maximize_income": "maximizing income",
-    "get_employed_fast": "rapid employment",
-    "remote_first": "remote-first work",
-    "learn_new_skills": "learning new skills",
-    "stable_employment": "stable employment",
-    "resume_building": "resume building",
-}
+def available_goals(catalog: KnowledgeCatalog | None = None) -> list[GoalDefinition]:
+    knowledge = catalog or load_knowledge()
+    return [knowledge.goals[name] for name in sorted(knowledge.goals)]
+
+
+def require_goal(goal_name: str, catalog: KnowledgeCatalog | None = None) -> GoalDefinition:
+    normalized = _normalize_identifier(goal_name)
+    knowledge = catalog or load_knowledge()
+    goal = knowledge.goals.get(normalized)
+    if goal is None:
+        available = ", ".join(sorted(knowledge.goals)) or "none configured"
+        raise ValueError(f"Unknown goal {goal_name!r}. Available goals: {available}.")
+    return goal
 
 
 def build_knowledge_report(job: Any, profile: SearchProfile | None = None, catalog: KnowledgeCatalog | None = None) -> KnowledgeReport:
@@ -176,20 +190,9 @@ def build_knowledge_report(job: Any, profile: SearchProfile | None = None, catal
             score_adjustment += knowledge.weights.preferred_concept
             profile_boosts.append(f"profile preference boost: concept {match.concept} ({knowledge.weights.preferred_concept:+d})")
 
-        preferred_roles = sorted(set(concept.role_families) & preferred_role_families)
-        for role_family in preferred_roles:
-            score_adjustment += knowledge.weights.preferred_role_family
-            profile_boosts.append(f"profile preference boost: role family {role_family} via {match.concept} ({knowledge.weights.preferred_role_family:+d})")
-
         conflict_reasons: list[str] = []
         if match.concept in avoided_concepts:
             conflict_reasons.append(f"avoided concept {match.concept}")
-        avoided_roles = sorted(set(concept.role_families) & avoided_role_families)
-        if avoided_roles:
-            conflict_reasons.append("avoided role family " + ", ".join(avoided_roles))
-        conflicting_targets = sorted(set(concept.conflicts) & (preferred_concepts | preferred_role_families))
-        if conflicting_targets:
-            conflict_reasons.append("conflicts with " + ", ".join(conflicting_targets))
         if conflict_reasons:
             score_adjustment += knowledge.weights.conflict
             conflict_penalties.append(
@@ -199,19 +202,21 @@ def build_knowledge_report(job: Any, profile: SearchProfile | None = None, catal
     goal_modifier = 0
     goal_notes: list[str] = []
     active_goal = profile.active_goal if profile else None
+    goal_label: str | None = None
     if active_goal:
-        matched_concept_names = {match.concept for match in matches}
+        goal = require_goal(active_goal, knowledge)
+        goal_label = goal.label
+        matched_concept_names = {match.concept for match in matches} | _goal_signal_concepts(job)
         for concept_name in sorted(matched_concept_names):
             concept = knowledge.concepts.get(concept_name)
-            if concept and concept.weights and active_goal in concept.weights:
-                wt = concept.weights[active_goal]
-                goal_modifier += wt
+            if concept and active_goal in concept.weights:
+                weight = concept.weights[active_goal]
+                goal_modifier += weight
                 concept_display = " ".join(part.capitalize() for part in concept_name.split("_"))
-                goal_desc = GOAL_DESCRIPTIONS.get(active_goal, active_goal.replace("_", " "))
-                if wt >= 0:
-                    goal_notes.append(f"+{wt} {concept_display} supports {goal_desc}")
+                if weight >= 0:
+                    goal_notes.append(f"{weight:+d} {concept_display} supports {goal.description}")
                 else:
-                    goal_notes.append(f"{wt} {concept_display} conflicts with {goal_desc}")
+                    goal_notes.append(f"{weight:+d} {concept_display} works against {goal.description}")
 
     return KnowledgeReport(
         matches=matches,
@@ -219,8 +224,21 @@ def build_knowledge_report(job: Any, profile: SearchProfile | None = None, catal
         conflict_penalties=conflict_penalties,
         score_adjustment=score_adjustment,
         goal_modifier=goal_modifier,
+        goal_label=goal_label,
         goal_notes=goal_notes,
     )
+
+
+def _goal_signal_concepts(job: Any) -> set[str]:
+    signals: set[str] = set()
+    remote_value = job.get("remote") if isinstance(job, dict) else getattr(job, "remote", False)
+    remote_type = job.get("remote_type", "") if isinstance(job, dict) else getattr(job, "remote_type", "")
+    if bool(remote_value) or "remote" in str(remote_type).lower() or "remote" in _job_text(job).lower():
+        signals.add("remote")
+    salary = job.get("salary_text", "") if isinstance(job, dict) else getattr(job, "salary_text", "")
+    if not str(salary or "").strip():
+        signals.add("salary_unknown")
+    return signals
 
 
 def _load_raw_knowledge(path: Path) -> dict[str, Any]:
@@ -247,6 +265,24 @@ def _parse_weights(raw: Any) -> KnowledgeWeights:
         preferred_role_family=int(raw.get("preferred_role_family", KnowledgeWeights.preferred_role_family)),
         preferred_concept=int(raw.get("preferred_concept", KnowledgeWeights.preferred_concept)),
     )
+
+
+def _parse_goals(raw: Any) -> dict[str, GoalDefinition]:
+    if not isinstance(raw, dict):
+        return {}
+    goals: dict[str, GoalDefinition] = {}
+    for name, payload in raw.items():
+        goal_name = _normalize_identifier(str(name))
+        if not goal_name:
+            continue
+        if isinstance(payload, dict):
+            label = str(payload.get("label") or goal_name.replace("_", " ").title()).strip()
+            description = str(payload.get("description") or label).strip()
+        else:
+            label = goal_name.replace("_", " ").title()
+            description = label
+        goals[goal_name] = GoalDefinition(name=goal_name, label=label, description=description)
+    return goals
 
 
 def _parse_concepts(raw: Any) -> dict[str, KnowledgeConcept]:
@@ -296,7 +332,7 @@ def _profile_preferences(profile: SearchProfile | None, knowledge: KnowledgeCata
     preferred_role_families: set[str] = set()
     avoided_role_families: set[str] = set()
 
-    catalog_profile = knowledge.profiles.get("miles")
+    catalog_profile = knowledge.profiles.get(profile.name) if profile is not None else None
     if catalog_profile is not None:
         preferred_concepts.update(catalog_profile.preferred_concepts)
         avoided_concepts.update(catalog_profile.avoided_concepts)

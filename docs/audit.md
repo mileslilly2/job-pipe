@@ -18,7 +18,7 @@ The architecture is simple and mostly data-driven. YAML files hold the mutable w
 
 - The core scoring pipeline is deterministic and explainable.
 - The workspace model is local-first and easy to inspect or back up.
-- The knowledge graph gives the scoring system a more explicit vocabulary than a pure keyword matcher.
+- The knowledge graph gives the scoring system a more explicit vocabulary than a pure keyword matcher, and the active goal makes the same role evaluate differently when the objective changes.
 - The CLI, dashboard, and exporter all read from the same SQLite-backed state.
 - The test suite is strong for this size of project: 78 tests passed after the audit changes landed.
 - Package generation and tailor output are constrained by the candidate profile, which reduces the risk of inventing experience.
@@ -53,7 +53,7 @@ Coverage is good, but a few areas still deserve attention:
 - `data/knowledge.yaml` is flexible, but it is also easy to overfit to one candidate profile.
 - Learned weights are stored separately from the concept graph, so the effective score is distributed across multiple files.
 - Role-family classification still depends on hand-maintained phrase lists and can be brittle for unusual titles.
-- The current model favors deterministic explainability over statistical robustness, which is a good tradeoff here but should be documented whenever weights change.
+- The current model favors deterministic explainability over statistical robustness: goals, preference tiers, knowledge matches, and learned weights are all local data or deterministic rules and should be documented whenever weights change.
 
 ## CLI UX Issues
 

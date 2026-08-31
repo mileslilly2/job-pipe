@@ -58,6 +58,8 @@ def test_analytics_aggregates_cli_and_web_metrics(initialized_workspace, runner)
     assert report.summary["saved_not_packaged"] == 1
     assert report.summary["packaged_not_applied"] >= 1
     assert report.summary["followups_due"] == 1
+    assert report.current_goal == "get_employed_fast"
+    assert "goal_satisfying_jobs" in report.summary
     assert report.top_apply_today
     assert report.top_role_families_by_score
     assert report.top_sources_by_high_fit_jobs

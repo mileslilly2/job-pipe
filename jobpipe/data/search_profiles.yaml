@@ -1,19 +1,18 @@
 - name: miles
-  target_role_families:
-    - junior_software_engineer
-    - software_engineer
+  active_goal: get_employed_fast
+  preferred:
     - backend_api
-    - data_engineer
     - python_automation
+    - data_engineer
+  acceptable:
     - qa_automation
+    - help_desk
+    - technical_support
     - ai_evaluation
-    - technical_operations
-  excluded_role_families:
+  avoid:
     - legal_counsel
-    - security_only
-    - ml_research
-    - senior_research
-    - data_products
+    - physician
+    - truck_driver
   preferred_locations:
     - Remote US
     - United States
@@ -26,7 +25,6 @@
     - Dublin
     - Sydney
     - UK-only
-    - Canada-only
     - Europe-only
   positive_keywords:
     - python
@@ -45,11 +43,6 @@
     - cli
     - remote
   negative_keywords:
-    - help desk
-    - helpdesk
-    - service desk
-    - customer support
-    - customer success
     - sales
     - sdr
     - bdr

@@ -105,10 +105,11 @@ jobpipe export
 
 Job Pipe uses a deterministic knowledge graph rather than an LLM for core ranking.
 
-- `data/knowledge.yaml` defines canonical concepts, aliases, related concepts, conflicts, and role-family links.
-- `data/search_profiles.yaml` defines the active search profile, including preferred and excluded role families and keywords.
+- `data/knowledge.yaml` defines canonical concepts, aliases, related concepts, role-family links, the available goals, and goal-dependent modifiers.
+- `data/search_profiles.yaml` selects one active goal and role preference tiers: `preferred`, `acceptable`, and `avoid`. Acceptable roles are neutral rather than conflicts.
 - `data/learned_weights.yaml` stores feedback-driven adjustments derived from saved, skipped, packaged, and applied decisions.
-- `score_job_fit_v1` combines role-family classification, knowledge-graph matches, profile preferences, seniority signals, remote/work-style signals, and learned weights.
+- `score_job_fit_v1` combines base signals, goal modifiers, knowledge matches, preference tiers, practical constraints, and learned feedback weights.
+- Use `python3 -m jobpipe.cli goals`, `python3 -m jobpipe.cli goal get`, and `python3 -m jobpipe.cli goal set <goal-id>` to inspect or change the current objective.
 - The score is explainable: CLI details and dashboard views show the notes that produced the final fit score.
 - `score_job_fit_v1` is the canonical user-facing fit score. SQLite `fit_score` is a cache for convenience, not the source of truth.
 
@@ -121,7 +122,7 @@ The local FastAPI dashboard runs on `127.0.0.1:8765`.
 - `/kanban` groups jobs by pipeline stage.
 - `/views` links to saved filter presets.
 - `/followups` lists applied jobs that need attention.
-- `/analytics` summarizes applications today, applications this week, high-fit jobs, skip reasons, and role-family rates.
+- `/analytics` summarizes applications today, applications this week, the current goal, jobs with positive goal impact, skip reasons, and role-family rates.
 
 The dashboard is read-only except for the same workflow actions exposed in the CLI: save, skip, package, open apply, open package, copy text, and move status.
 

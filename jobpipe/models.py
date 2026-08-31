@@ -109,8 +109,9 @@ class JobFacts(BaseModel):
 
 
 class ProfileFacts(BaseModel):
-    role_families: list[str] = Field(default_factory=list)
-    excluded_role_families: list[str] = Field(default_factory=list)
+    preferred_role_families: list[str] = Field(default_factory=list)
+    acceptable_role_families: list[str] = Field(default_factory=list)
+    avoid_role_families: list[str] = Field(default_factory=list)
     skills_preferred: list[str] = Field(default_factory=list)
     skills_avoided: list[str] = Field(default_factory=list)
     preferred_locations: list[str] = Field(default_factory=list)

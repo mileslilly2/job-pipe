@@ -1,9 +1,9 @@
 from jobpipe.catalog import load_search_profile
-from jobpipe.models import DiscoveredJob
+from jobpipe.models import DiscoveredJob, SearchProfile
 from jobpipe.score import classify_role_family, score_job_fit_v1
 
 
-def test_help_desk_analyst_does_not_outrank_junior_data_engineer() -> None:
+def test_career_acceleration_ranks_data_engineering_over_help_desk() -> None:
     help_desk = DiscoveredJob(
         provider="lever",
         external_id="help-desk-1",
@@ -27,15 +27,18 @@ def test_help_desk_analyst_does_not_outrank_junior_data_engineer() -> None:
         posted_at="2026-06-22T00:00:00+00:00",
     )
 
-    help_score, help_notes = score_job_fit_v1(help_desk)
-    data_score, data_notes = score_job_fit_v1(junior_data_engineer)
+    profile = SearchProfile(name="test", active_goal="career_acceleration")
+    help_score, help_notes = score_job_fit_v1(help_desk, profile=profile)
+    data_score, data_notes = score_job_fit_v1(junior_data_engineer, profile=profile)
 
-    assert help_score < data_score
+    assert any("Help Desk works against career acceleration" in note for note in help_notes)
+    assert any("Backend Api supports career acceleration" in note for note in data_notes)
+    assert help_score > 0 and data_score > 0
     assert any("role family: help_desk" in note for note in help_notes)
     assert any("role family: data_engineer" in note for note in data_notes)
 
 
-def test_remote_bonus_cannot_overcome_bad_role_family() -> None:
+def test_career_acceleration_outweighs_remote_bonus_for_help_desk() -> None:
     remote_support = DiscoveredJob(
         provider="lever",
         external_id="help-desk-2",
@@ -59,10 +62,12 @@ def test_remote_bonus_cannot_overcome_bad_role_family() -> None:
         posted_at="2026-06-22T00:00:00+00:00",
     )
 
-    remote_support_score, remote_support_notes = score_job_fit_v1(remote_support)
-    onsite_target_score, _ = score_job_fit_v1(onsite_target)
+    profile = SearchProfile(name="test", active_goal="career_acceleration")
+    remote_support_score, remote_support_notes = score_job_fit_v1(remote_support, profile=profile)
+    onsite_target_score, _ = score_job_fit_v1(onsite_target, profile=profile)
 
-    assert remote_support_score < onsite_target_score
+    assert any("Help Desk works against career acceleration" in note for note in remote_support_notes)
+    assert remote_support_score > 0 and onsite_target_score > 0
     assert any("remote-friendly" in note for note in remote_support_notes)
     assert any("role family: help_desk" in note for note in remote_support_notes)
 

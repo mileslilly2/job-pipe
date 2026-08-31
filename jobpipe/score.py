@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .facts import ROLE_FAMILY_SCORES, build_fact_report, classify_role_family as _classify_role_family, extract_job_facts
+from .facts import build_fact_report, classify_role_family as _classify_role_family, extract_job_facts
 from .knowledge import build_knowledge_report
 from .models import CandidateProfile, ParsedJob, RolePack, SearchProfile
 
@@ -33,14 +33,6 @@ TECHNICAL_OPS_TERMS = (
 )
 
 PROGRAMMING_TERMS = ("python", "automation", "scripting", "cli", "pipeline", "pipelines", "sql", "api", "testing", "terraform", "bash", "git")
-
-HARD_FAMILY_SCORE_CAPS = {
-    "legal_counsel": 30,
-    "security_only": 42,
-    "ml_research": 45,
-    "senior_research": 38,
-    "data_products": 36,
-}
 
 classify_role_family = _classify_role_family
 
@@ -181,15 +173,17 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
     notes: list[str] = ["base score: 10"]
 
     family, family_matches, family_reason = _classify_role_family(job)
-    family_score = ROLE_FAMILY_SCORES.get(family, 0)
-    score += family_score
-    notes.append(f"role family: {family} ({family_score:+d})")
+    notes.append(f"role family: {family}")
     if family_matches:
         notes.append("matched role signals: " + ", ".join(family_matches))
     if family_reason:
         notes.append(family_reason)
 
     knowledge_report = build_knowledge_report(job, profile=profile)
+    if knowledge_report.goal_notes:
+        notes.append(f"goal: {knowledge_report.goal_label}")
+        notes.extend(knowledge_report.goal_notes)
+        score += knowledge_report.goal_modifier
     if knowledge_report.matches or knowledge_report.profile_boosts or knowledge_report.conflict_penalties:
         score += knowledge_report.score_adjustment
         notes.extend(knowledge_report.notes)
@@ -251,11 +245,6 @@ def score_job_fit_v1(job: Any, learned_weights: dict[str, Any] | None = None, pr
                 adj = keyword_adjustments[kw]
                 score += adj
                 notes.append(f"{adj:+d} learned adjustment: keyword '{kw}'")
-
-    family_cap = HARD_FAMILY_SCORE_CAPS.get(family)
-    if family_cap is not None and score > family_cap:
-        score = family_cap
-        notes.append(f"hard family ceiling: {family} ({family_cap})")
 
     location_cap, location_reason = _location_score_cap(_field(job, "location"), profile)
     if score > location_cap:

@@ -16,6 +16,8 @@
   <div class="card"><div class="muted">Saved not packaged</div><div class="stat">{{ report.summary.saved_not_packaged }}</div></div>
   <div class="card"><div class="muted">Packaged not applied</div><div class="stat">{{ report.summary.packaged_not_applied }}</div></div>
   <div class="card"><div class="muted">Follow-ups due</div><div class="stat">{{ report.summary.followups_due }}</div></div>
+  <div class="card"><div class="muted">Current goal</div><div class="stat">{{ report.current_goal or "None" }}</div></div>
+  <div class="card"><div class="muted">Jobs satisfying goal</div><div class="stat">{{ report.summary.goal_satisfying_jobs }}</div></div>
 </section>
 
 <section class="card stack">

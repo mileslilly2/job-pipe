@@ -9,6 +9,7 @@ from .catalog import load_search_profile
 from .application_package import application_package_paths
 from .db import due_followups, fetch_all, list_jobs
 from .learn import load_learned_weights
+from .knowledge import build_knowledge_report
 from .score import score_job_fit_v1
 
 HIGH_FIT_THRESHOLD = 70
@@ -19,6 +20,7 @@ TOP_LIMIT = 10
 class AnalyticsReport:
     generated_at: str
     summary: dict[str, int]
+    current_goal: str | None = None
     top_apply_today: list[dict[str, Any]] = field(default_factory=list)
     top_role_families_by_score: list[dict[str, Any]] = field(default_factory=list)
     top_sources_by_high_fit_jobs: list[dict[str, Any]] = field(default_factory=list)
@@ -27,7 +29,8 @@ class AnalyticsReport:
 
 
 def build_analytics_report(*, high_fit_threshold: int = HIGH_FIT_THRESHOLD, top_limit: int = TOP_LIMIT) -> AnalyticsReport:
-    jobs = _decorate_jobs(list_jobs())
+    profile = load_search_profile()
+    jobs = _decorate_jobs(list_jobs(), profile=profile)
     today = datetime.now().astimezone().date()
     week_start = today - timedelta(days=today.weekday())
 
@@ -52,10 +55,12 @@ def build_analytics_report(*, high_fit_threshold: int = HIGH_FIT_THRESHOLD, top_
         'followups_due': len(due_followups(limit=1000)),
         'high_fit_jobs': sum(1 for job in jobs if int(job.get('score') or 0) >= high_fit_threshold),
         'active_jobs': sum(1 for job in jobs if _is_active_job(job)),
+        "goal_satisfying_jobs": sum(1 for job in jobs if int(job.get("goal_modifier") or 0) > 0),
     }
 
     return AnalyticsReport(
         generated_at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        current_goal=profile.active_goal,
         summary=summary,
         top_apply_today=_top_apply_candidates(jobs, top_limit=top_limit),
         top_role_families_by_score=_top_role_families_by_score(jobs),
@@ -65,15 +70,16 @@ def build_analytics_report(*, high_fit_threshold: int = HIGH_FIT_THRESHOLD, top_
     )
 
 
-def _decorate_jobs(rows) -> list[dict[str, Any]]:
+def _decorate_jobs(rows, *, profile=None) -> list[dict[str, Any]]:
     learned_weights = load_learned_weights()
-    profile = load_search_profile()
+    profile = profile or load_search_profile()
     jobs: list[dict[str, Any]] = []
     for row in rows:
         job = dict(row)
         score, notes = score_job_fit_v1(job, learned_weights=learned_weights, profile=profile)
         job['score'] = score
         job['score_notes'] = notes
+        job["goal_modifier"] = build_knowledge_report(job, profile=profile).goal_modifier
         job['display_status'] = _display_status(job)
         paths = application_package_paths(job)
         job['has_package'] = any(path.exists() for path in [paths.job_md, paths.fit_md, paths.resume_tailored_md, paths.cover_note_md, paths.apply_md])

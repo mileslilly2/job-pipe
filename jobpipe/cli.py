@@ -10,7 +10,7 @@ from rich.table import Table
 
 from .browser import copy_file, open_path, open_url
 from .application_package import application_package_paths, build_application_package
-from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, source_identity, source_identity_label
+from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, save_search_profiles, source_identity, source_identity_label
 from .facts import build_fact_report
 from .classify import classify_job, detect_seniority
 from .db import (
@@ -33,6 +33,7 @@ from .db import (
 from .export import export_tracker_csv
 from .ingest import filter_discovered_jobs, ingest_text_file, ingest_url, load_job_sources, resolve_job_sources
 from .learn import load_learned_weights, sync_weights
+from .knowledge import available_goals, require_goal
 from .models import CandidateProfile, FeedbackEvent, JobAnalysis, JobSource, ParsedJob, RolePack
 from .packet import build_packet_context
 from .parse import parse_job_text
@@ -47,6 +48,7 @@ from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, packa
 app = typer.Typer(help="Application cockpit for repetitive job applications.")
 profiles_app = typer.Typer(help="Manage search profiles.")
 sources_app = typer.Typer(help="Manage configured job sources.")
+goal_app = typer.Typer(help="View or change the active search goal.")
 console = Console()
 ALLOWED_FEEDBACK_ACTIONS = {"saved", "skipped", "packaged", "applied"}
 
@@ -230,8 +232,9 @@ def _print_job_details(job_row, profile=None) -> None:
         profile_facts.add_column("Field")
         profile_facts.add_column("Value")
         profile_data = fact_report.profile
-        profile_facts.add_row("Target role families", ", ".join(profile_data.role_families) or "None")
-        profile_facts.add_row("Excluded role families", ", ".join(profile_data.excluded_role_families) or "None")
+        profile_facts.add_row("Preferred role families", ", ".join(profile_data.preferred_role_families) or "None")
+        profile_facts.add_row("Acceptable role families", ", ".join(profile_data.acceptable_role_families) or "None")
+        profile_facts.add_row("Avoid role families", ", ".join(profile_data.avoid_role_families) or "None")
         profile_facts.add_row("Preferred locations", ", ".join(profile_data.preferred_locations) or "None")
         profile_facts.add_row("Allowed locations", ", ".join(profile_data.allowed_locations) or "None")
         profile_facts.add_row("Excluded locations", ", ".join(profile_data.excluded_locations) or "None")
@@ -283,6 +286,8 @@ def _print_analytics_report(report) -> None:
     summary.add_row("Follow-ups due", str(report.summary["followups_due"]))
     summary.add_row("High-fit jobs", str(report.summary["high_fit_jobs"]))
     summary.add_row("Active jobs", str(report.summary["active_jobs"]))
+    summary.add_row("Current goal", report.current_goal or "None")
+    summary.add_row("Jobs satisfying goal", str(report.summary["goal_satisfying_jobs"]))
     console.print(summary)
 
     top_jobs = Table(title="Top 10 Jobs to Apply Today")
@@ -854,6 +859,42 @@ def due(limit: int = typer.Option(20, min=1, help="Maximum number of due follow-
     console.print(table)
 
 
+@app.command("goals")
+def goals() -> None:
+    _ensure_workspace()
+    table = Table(title="Available Goals")
+    table.add_column("Goal")
+    table.add_column("Description")
+    for goal in available_goals():
+        table.add_row(goal.name, goal.description)
+    console.print(table)
+
+
+@goal_app.command("get")
+def goal_get() -> None:
+    _ensure_workspace()
+    profile = load_search_profile()
+    if not profile.active_goal:
+        console.print("No active goal configured.")
+        return
+    goal = require_goal(profile.active_goal)
+    console.print(f"Current goal: {goal.name} — {goal.description}")
+
+
+@goal_app.command("set")
+def goal_set(goal_name: str) -> None:
+    _ensure_workspace()
+    try:
+        goal = require_goal(goal_name)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    loaded = load_search_profiles()
+    profile = load_search_profile()
+    loaded.profiles[profile.name] = profile.model_copy(update={"active_goal": goal.name})
+    save_search_profiles(loaded)
+    console.print(f"Active goal set to {goal.name}: {goal.description}")
+
+
 @app.command("analytics")
 def analytics() -> None:
     _ensure_workspace()
@@ -974,14 +1015,15 @@ def profiles_list() -> None:
         return
 
     table = Table(title="Search Profiles")
-    for column in ["Name", "Target Families", "Positive Keywords", "Negative Keywords", "Work Styles", "Preferred Levels", "Excluded Levels"]:
+    for column in ["Name", "Goal", "Preferred", "Acceptable", "Avoid", "Work Styles", "Preferred Levels", "Excluded Levels"]:
         table.add_column(column)
     for profile in loaded.profiles.values():
         table.add_row(
             profile.name,
-            ", ".join(profile.target_role_families),
-            ", ".join(profile.positive_keywords),
-            ", ".join(profile.negative_keywords),
+            profile.active_goal or "",
+            ", ".join(profile.preferred),
+            ", ".join(profile.acceptable),
+            ", ".join(profile.avoid),
             ", ".join(profile.preferred_work_styles),
             ", ".join(profile.preferred_role_levels),
             ", ".join(profile.excluded_levels),
@@ -1001,7 +1043,10 @@ def profiles_show(profile_name: str) -> None:
     table.add_column("Value")
     rows = [
         ("Name", profile.name),
-        ("Target Role Families", ", ".join(profile.target_role_families)),
+        ("Active Goal", profile.active_goal or "None"),
+        ("Preferred Role Families", ", ".join(profile.preferred)),
+        ("Acceptable Role Families", ", ".join(profile.acceptable)),
+        ("Avoid Role Families", ", ".join(profile.avoid)),
         ("Positive Keywords", ", ".join(profile.positive_keywords)),
         ("Negative Keywords", ", ".join(profile.negative_keywords)),
         ("Preferred Work Styles", ", ".join(profile.preferred_work_styles)),
@@ -1178,6 +1223,7 @@ def sources_test(source_id: str | None = typer.Argument(None, help="Optional com
 
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(sources_app, name="sources")
+app.add_typer(goal_app, name="goal")
 
 
 @app.command("feedback")

@@ -51,7 +51,11 @@ def load_search_profiles(path: Path | None = None) -> LoadedSearchProfiles:
             raise ValueError("search profile config must be a YAML list")
         for item in raw:
             profile = SearchProfile.model_validate(item)
-            profiles[profile.name.strip().lower()] = normalize_search_profile(profile)
+            normalized = normalize_search_profile(profile)
+            if normalized.active_goal:
+                from .knowledge import require_goal
+                require_goal(normalized.active_goal)
+            profiles[normalized.name] = normalized
     return LoadedSearchProfiles(profiles=profiles, origin=origin, path=resolved)
 
 
@@ -130,8 +134,8 @@ def normalize_search_profile(profile: SearchProfile) -> SearchProfile:
         preferred=[value.strip().lower() for value in preferred_raw if value and value.strip()],
         acceptable=[value.strip().lower() for value in profile.acceptable if value and value.strip()],
         avoid=[value.strip().lower() for value in avoid_raw if value and value.strip()],
-        target_role_families=[value.strip().lower() for value in profile.target_role_families if value and value.strip()],
-        excluded_role_families=[value.strip().lower() for value in profile.excluded_role_families if value and value.strip()],
+        target_role_families=[],
+        excluded_role_families=[],
         positive_keywords=[value.strip().lower() for value in profile.positive_keywords if value and value.strip()],
         negative_keywords=[value.strip().lower() for value in profile.negative_keywords if value and value.strip()],
         preferred_locations=[value.strip().lower() for value in profile.preferred_locations if value and value.strip()],
@@ -145,7 +149,10 @@ def normalize_search_profile(profile: SearchProfile) -> SearchProfile:
 
 def save_search_profiles(loaded: LoadedSearchProfiles, path: Path | None = None) -> None:
     actual = path or loaded.path or search_profiles_path()
-    payload = [profile.model_dump(exclude_none=True) for profile in loaded.profiles.values()]
+    payload = [
+        profile.model_dump(exclude_none=True, exclude={"target_role_families", "excluded_role_families"})
+        for profile in loaded.profiles.values()
+    ]
     import yaml
     actual.write_text(yaml.safe_dump(payload, sort_keys=False, default_flow_style=False), encoding="utf-8")
 

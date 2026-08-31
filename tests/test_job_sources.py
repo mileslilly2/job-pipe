@@ -406,8 +406,9 @@ def test_sources_test_uses_active_sources_and_allows_targeting_disabled_sources(
 def test_search_profile_miles_loaded_from_packaged_data() -> None:
     profile = load_search_profile("miles", Path("jobpipe/data/search_profiles.yaml"))
     assert profile.name == "miles"
-    assert "data_engineer" in profile.target_role_families
-    assert "legal_counsel" in profile.excluded_role_families
+    assert profile.active_goal == "get_employed_fast"
+    assert "data_engineer" in profile.preferred
+    assert "legal_counsel" in profile.avoid
     assert "remote us" in profile.preferred_locations
     assert "canada" in profile.allowed_locations
     assert "paris" in profile.excluded_locations
@@ -544,3 +545,19 @@ def test_profile_aware_filtering_excludes_excluded_levels() -> None:
     filtered = filter_discovered_jobs(jobs, source, profile)
 
     assert [job.external_id for job in filtered] == ["good"]
+
+
+
+def test_goal_commands_update_active_profile(initialized_workspace, runner) -> None:
+    listed = runner.invoke(app, ["goals"])
+    assert listed.exit_code == 0
+    assert "get_employed_fast" in listed.stdout
+
+    current = runner.invoke(app, ["goal", "get"])
+    assert current.exit_code == 0
+    assert "get_employed_fast" in current.stdout
+
+    changed = runner.invoke(app, ["goal", "set", "career_acceleration"])
+    assert changed.exit_code == 0
+    assert "career_acceleration" in changed.stdout
+    assert load_search_profile().active_goal == "career_acceleration"

@@ -161,12 +161,12 @@ def filter_discovered_jobs(jobs: list[DiscoveredJob], source: JobSource, profile
     active_profile = profile or load_search_profile()
     include_keywords = _explicit_keywords(source.include_keywords)
     exclude_keywords = _effective_keywords(source.exclude_keywords, DEFAULT_EXCLUDE_KEYWORDS)
-    target_role_families = _effective_role_families(source.target_role_families, active_profile.target_role_families)
+    target_role_families = _effective_role_families(source.target_role_families, active_profile.preferred + active_profile.acceptable)
     profile_keywords = _explicit_keywords(active_profile.positive_keywords)
     profile_negative_keywords = _explicit_keywords(active_profile.negative_keywords)
     filtered: list[DiscoveredJob] = []
     for job in jobs:
-        if _job_matches_source(job, target_role_families, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords, active_profile.excluded_levels):
+        if _job_matches_source(job, target_role_families, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords, active_profile.excluded_levels, active_profile.avoid):
             filtered.append(job)
     return filtered
 
@@ -199,11 +199,12 @@ def _job_matches_source(
     profile_keywords: list[str],
     profile_negative_keywords: list[str],
     excluded_levels: list[str],
+    avoid_role_families: list[str],
 ) -> bool:
     family, _matched, _reason = classify_role_family(job)
-    if family in NEGATIVE_ROLE_FAMILIES:
-        return False
     if family not in target_role_families:
+        return False
+    if family in {value.strip().lower() for value in avoid_role_families if value and value.strip()}:
         return False
     if _job_matches_profile(job, profile_negative_keywords, excluded_levels):
         return False
@@ -243,8 +244,6 @@ def _has_title_signal(job: DiscoveredJob, family: str, include_keywords: list[st
             "description": "",
         }
     )
-    if title_family in NEGATIVE_ROLE_FAMILIES:
-        return False
     if title_family == family:
         return True
     if any(_phrase_in_text(title_text, term) for term in include_keywords + profile_keywords):

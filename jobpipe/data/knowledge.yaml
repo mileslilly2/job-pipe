@@ -6,6 +6,29 @@ match_weights:
   preferred_role_family: 4
   preferred_concept: 2
 
+goals:
+  career_acceleration:
+    label: Career Acceleration
+    description: career acceleration
+  maximize_income:
+    label: Maximize Income
+    description: maximizing income
+  get_employed_fast:
+    label: Get Employed Fast
+    description: rapid employment
+  remote_first:
+    label: Remote First
+    description: remote-first work
+  learn_new_skills:
+    label: Learn New Skills
+    description: learning new skills
+  stable_employment:
+    label: Stable Employment
+    description: stable employment
+  resume_building:
+    label: Resume Building
+    description: resume building
+
 concepts:
   automation:
     aliases:
@@ -32,6 +55,10 @@ concepts:
       - microservices
       - internal tooling
       - internal tools
+    weights:
+      career_acceleration: 15
+      maximize_income: 12
+      get_employed_fast: 5
     related:
       - automation
       - data_engineering
@@ -63,6 +90,11 @@ concepts:
       - sdet
       - playwright
       - pytest
+    weights:
+      career_acceleration: 8
+      get_employed_fast: 7
+      learn_new_skills: 10
+      resume_building: 8
     related:
       - automation
     conflicts:
@@ -76,6 +108,9 @@ concepts:
       - model evaluation
       - evals
       - evaluation engineer
+    weights:
+      resume_building: 12
+      get_employed_fast: 6
     related:
       - automation
     role_families:
@@ -86,6 +121,10 @@ concepts:
       - helpdesk
       - service desk
       - desk support
+    weights:
+      career_acceleration: -15
+      get_employed_fast: 10
+      stable_employment: 8
     conflicts:
       - automation
       - backend_api
@@ -161,33 +200,13 @@ concepts:
     role_families:
       - technical_operations
 
-profiles:
-  miles:
-    preferred_concepts:
-      - automation
-      - backend_api
-      - data_engineering
-      - qa_automation
-      - ai_evaluation
-      - python
-      - sql
-      - etl
-      - debugging
-      - documentation
-      - cli
-    avoided_concepts:
-      - help_desk
-      - customer_support
-    preferred_role_families:
-      - python_automation
-      - backend_api
-      - data_engineer
-      - qa_automation
-      - ai_evaluation
-      - technical_operations
-    avoided_role_families:
-      - help_desk
-      - customer_support
-      - sales
-      - clinical_admin
-      - manager
+  remote:
+    role_families: []
+    weights:
+      remote_first: 12
+  salary_unknown:
+    role_families: []
+    weights:
+      maximize_income: -3
+
+profiles: {}
