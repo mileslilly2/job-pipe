@@ -10,12 +10,47 @@ goals:
   career_acceleration:
     label: Career Acceleration
     description: career acceleration
+    role_family_modifiers:
+      backend_api: 12
+      data_engineering: 12
+      python_automation: 10
+      software_engineering: 8
+      full_stack: 8
+      qa_automation: 8
+      ai_evaluation: 6
+      machine_learning: 8
+      ai_research: 8
+      data_analytics: 8
+      infrastructure: 5
+      security: 5
+      frontend: 4
+      help_desk: -8
+      technical_support: -5
+      legal: -8
+      sales: -8
   maximize_income:
     label: Maximize Income
     description: maximizing income
   get_employed_fast:
     label: Get Employed Fast
     description: rapid employment
+    role_family_modifiers:
+      help_desk: 10
+      technical_support: 9
+      qa_automation: 7
+      python_automation: 7
+      backend_api: 6
+      ai_evaluation: 6
+      full_stack: 5
+      data_engineering: 5
+      software_engineering: 4
+      frontend: 4
+      security: 3
+      infrastructure: 3
+      data_analytics: 3
+      machine_learning: 2
+      product: 2
+      ai_research: 1
   remote_first:
     label: Remote First
     description: remote-first work

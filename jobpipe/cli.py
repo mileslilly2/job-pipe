@@ -44,7 +44,7 @@ from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .recommend import make_recommendation
 from .analytics import build_analytics_report
-from .score import score_fit, score_job_fit_v1, score_quality, score_risk
+from .score import score_fit, score_job_fit_v1, score_job_fit_breakdown, score_quality, score_risk
 from .tailor import tailor_job
 from .tracker import ALLOWED_STATUSES, due_followups, update_status
 from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, package_dir, root_dir, slugify
@@ -635,6 +635,33 @@ def shortlist(min_fit: int = 70, max_risk: int = 40, limit: int = 20) -> None:
         )
     console.print(table)
 
+
+@app.command("score-breakdown")
+def score_breakdown(job_id: int, goal: str | None = typer.Option(None, "--goal")) -> None:
+    _ensure_workspace()
+    row = get_job(job_id)
+    if row is None:
+        raise typer.BadParameter(f"Job {job_id} not found.")
+    profile = _load_active_profile()
+    if goal:
+        require_goal(goal)
+        profile = profile.model_copy(update={"active_goal": goal})
+    job = dict(row)
+    classification = get_classification(job_id)
+    if classification is not None:
+        job["primary_role_family"] = classification["primary_role_family"]
+        job["secondary_role_families"] = load_json(classification["secondary_role_families_json"])
+        job["canonical_seniority"] = classification["seniority"]
+    breakdown = score_job_fit_breakdown(job, learned_weights=load_learned_weights(), profile=profile)
+    console.print(f"Goal: {profile.active_goal or 'none'} | Primary: {breakdown.primary_role_family or 'unclassified'} | Secondary: {', '.join(breakdown.secondary_role_families) or 'none'}")
+    table = Table(title=f"Score breakdown for job {job_id}")
+    table.add_column("Category"); table.add_column("Contribution"); table.add_column("Points", justify="right")
+    for item in breakdown.contributions:
+        table.add_row(item.category, item.label, f"{item.amount:+d}")
+    console.print(table)
+    console.print(f"Pre-cap score: {breakdown.pre_cap_score}; location cap: {breakdown.location_cap}; displayed score: {breakdown.displayed_score}")
+    if breakdown.fact_evidence:
+        console.print("Fact evidence: " + "; ".join(breakdown.fact_evidence))
 
 @app.command("show")
 def show(job_id: int) -> None:

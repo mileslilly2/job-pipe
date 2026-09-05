@@ -42,6 +42,7 @@ class GoalDefinition:
     name: str
     label: str
     description: str
+    role_family_modifiers: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -205,10 +206,13 @@ def build_knowledge_report(job: Any, profile: SearchProfile | None = None, catal
     goal_label: str | None = None
     if active_goal:
         goal = require_goal(active_goal, knowledge)
+        persisted_roles = {str(job.get("primary_role_family") or "")} | {str(value) for value in job.get("secondary_role_families", ())} if isinstance(job, dict) else set()
         goal_label = goal.label
         matched_concept_names = {match.concept for match in matches} | _goal_signal_concepts(job)
         for concept_name in sorted(matched_concept_names):
             concept = knowledge.concepts.get(concept_name)
+            if persisted_roles and concept_name in goal.role_family_modifiers:
+                continue
             if concept and active_goal in concept.weights:
                 weight = concept.weights[active_goal]
                 goal_modifier += weight
@@ -281,7 +285,8 @@ def _parse_goals(raw: Any) -> dict[str, GoalDefinition]:
         else:
             label = goal_name.replace("_", " ").title()
             description = label
-        goals[goal_name] = GoalDefinition(name=goal_name, label=label, description=description)
+        modifiers = {str(key).strip().lower(): int(value) for key, value in payload.get("role_family_modifiers", {}).items()} if isinstance(payload, dict) and isinstance(payload.get("role_family_modifiers", {}), dict) else {}
+        goals[goal_name] = GoalDefinition(name=goal_name, label=label, description=description, role_family_modifiers=modifiers)
     return goals
 
 

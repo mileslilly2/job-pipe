@@ -12,7 +12,7 @@ from .models import DiscoveredJob, JobSource, ParsedJob, SearchProfile
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .score import classify_role_family
-from .utils import load_yaml, package_dir, slugify
+from .utils import load_yaml, package_dir, root_dir, slugify
 
 
 DEFAULT_TARGET_ROLE_FAMILIES = [
@@ -90,8 +90,19 @@ class LoadedJobSources:
 
 
 def ingest_text_file(path: Path) -> ParsedJob:
+    if _is_workspace_metadata_file(path):
+        raise ValueError(f"{path.name} is workspace/package metadata, not a job posting.")
     text = path.read_text(encoding="utf-8")
     return parse_job_text(text)
+
+
+def _is_workspace_metadata_file(path: Path) -> bool:
+    """Reject only known metadata files from this workspace's own tree."""
+    resolved = path.resolve()
+    workspace = root_dir().resolve()
+    if resolved in {workspace / "README.md", workspace / "AGENTS.md", workspace / "pyproject.toml"}:
+        return True
+    return resolved.name == "PKG-INFO" and workspace / "jobpipe.egg-info" in resolved.parents
 
 
 def ingest_url(url: str) -> tuple[ParsedJob, str | None]:

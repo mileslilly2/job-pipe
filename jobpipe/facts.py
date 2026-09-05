@@ -210,7 +210,8 @@ def extract_job_facts(job: Any) -> JobFacts:
     text = _job_text(job)
     role_family, _matches, _reason = classify_role_family(job)
     experience_min_years = extract_experience_min_years(text)
-    seniority, _notes = classify_seniority(job, experience_min_years=experience_min_years)
+    persisted_seniority = str(job.get("canonical_seniority") or job.get("seniority_level") or "") if isinstance(job, dict) else ""
+    seniority, _notes = (persisted_seniority, ["persisted canonical seniority"]) if persisted_seniority else classify_seniority(job, experience_min_years=experience_min_years)
     skills_required, skills_preferred = _extract_skills(text)
     remote = _remote_flag(job) or _has_any(text.lower(), ["remote", "work from home", "fully remote"])
     return JobFacts(

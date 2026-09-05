@@ -24,16 +24,20 @@ def classify_job(job: Any) -> Classification:
     title, body = _text(job, "title"), _text(job, "description")
     scores = []
     for family, aliases in ROLE_ALIASES.items():
-        evidence, score = [], 0
+        evidence, title_score, description_score, title_specificity = [], 0, 0, 0
         for alias in aliases:
             phrase = _normal(alias)
-            if _has(title, phrase): score += 100; evidence.append(f"title matched {alias!r}")
-            elif _has(body, phrase): score += 15; evidence.append(f"description matched {alias!r}")
-        if score: scores.append((score, family, evidence))
-    scores.sort(key=lambda item: (-item[0], item[1]))
+            if _has(title, phrase):
+                title_score += 100; title_specificity = max(title_specificity, len(phrase.split())); evidence.append(f"title matched {alias!r}")
+            elif _has(body, phrase):
+                description_score += 15; evidence.append(f"description matched {alias!r}")
+        if title_score or description_score:
+            scores.append((title_score, description_score, title_specificity, family, evidence))
     if scores:
-        _, primary, evidence = scores[0]
-        secondary = tuple(family for score, family, _ in scores[1:] if score >= 15)
+        # A title names the profession; description-only matches add context.
+        scores.sort(key=lambda item: (-bool(item[0]), -item[0], -item[2], item[3]))
+        _, _, _, primary, evidence = scores[0]
+        secondary = tuple(family for title_score, description_score, _title_specificity, family, _ in scores[1:] if title_score or description_score)
         evidence = tuple(evidence + [f"secondary concept: {item}" for item in secondary])
     else: primary, secondary, evidence = "other", (), ("no canonical role alias found",)
     seniority, seniority_evidence = classify_seniority(_text(job, "title"))

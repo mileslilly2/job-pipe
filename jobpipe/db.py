@@ -427,7 +427,7 @@ def list_jobs() -> list[sqlite3.Row]:
             jobs.location, jobs.remote, jobs.posted_at, jobs.discovered_at, jobs.fit_score, jobs.description, jobs.raw_text,
             jobs.status AS review_status,
             job_classifications.primary_role_family AS role_type,
-            job_classifications.primary_role_family AS primary_role_family,
+            job_classifications.primary_role_family AS primary_role_family, job_classifications.secondary_role_families_json, job_classifications.seniority AS canonical_seniority,
             job_classifications.seniority AS seniority_level, job_analysis.risk_score, job_analysis.quality_score,
             job_analysis.recommendation, job_analysis.skip_reason,
             applications.status, applications.followup_at

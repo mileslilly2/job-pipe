@@ -10,8 +10,7 @@ from .classification import normalize_role_family
 from .application_package import application_package_paths
 from .db import due_followups, fetch_all, list_jobs
 from .learn import load_learned_weights
-from .knowledge import build_knowledge_report
-from .score import score_job_fit_v1
+from .score import score_job_fit_breakdown
 
 HIGH_FIT_THRESHOLD = 70
 TOP_LIMIT = 10
@@ -81,10 +80,12 @@ def _decorate_jobs(rows, *, profile=None) -> list[dict[str, Any]]:
         if role_type:
             job["role_type"] = normalize_role_family(role_type)
             job["primary_role_family"] = job["role_type"]
-        score, notes = score_job_fit_v1(job, learned_weights=learned_weights, profile=profile)
-        job['score'] = score
-        job['score_notes'] = notes
-        job["goal_modifier"] = build_knowledge_report(job, profile=profile).goal_modifier
+        from .utils import load_json
+        job["secondary_role_families"] = load_json(job.get("secondary_role_families_json") or "[]")
+        breakdown = score_job_fit_breakdown(job, learned_weights=learned_weights, profile=profile)
+        job['score'] = breakdown.displayed_score
+        job['score_notes'] = list(breakdown.notes)
+        job["goal_modifier"] = breakdown.goal_specific_total
         job['display_status'] = _display_status(job)
         paths = application_package_paths(job)
         job['has_package'] = any(path.exists() for path in [paths.job_md, paths.fit_md, paths.resume_tailored_md, paths.cover_note_md, paths.apply_md])
