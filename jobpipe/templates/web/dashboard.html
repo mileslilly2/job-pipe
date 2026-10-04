@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid cards">
+  <div class="card"><div class="muted">Total jobs</div><div class="stat">{{ summary.total_jobs }}</div></div>
+  <div class="card"><div class="muted">New jobs</div><div class="stat">{{ summary.new_jobs }}</div></div>
+  <div class="card"><div class="muted">Saved jobs</div><div class="stat">{{ summary.saved_jobs }}</div></div>
+  <div class="card"><div class="muted">Packaged jobs</div><div class="stat">{{ summary.packaged_jobs }}</div></div>
+  <div class="card"><div class="muted">Applied jobs</div><div class="stat">{{ summary.applied_jobs }}</div></div>
+  <div class="card"><div class="muted">Skipped jobs</div><div class="stat">{{ summary.skipped_jobs }}</div></div>
+  <div class="card"><div class="muted">Due follow-ups</div><div class="stat">{{ summary.due_followups }}</div></div>
+</section>
+
+<section class="card stack">
+  <div class="actions">
+    <a class="button primary" href="/jobs">Open jobs</a>
+    <a class="button" href="/analytics">View analytics</a>
+    <a class="button" href="/followups">Review follow-ups</a>
+  </div>
+  <div class="muted">The dashboard is a thin layer over the existing SQLite tracker, scoring helpers, and package builder.</div>
+</section>
+
+{% if jobs %}
+<section class="card">
+  <h2>Recent jobs</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Provider</th>
+          <th>Discovered</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for job in jobs[:10] %}
+        <tr>
+          <td>{{ job.score }}</td>
+          <td>{{ job.company }}</td>
+          <td>{{ job.title }}</td>
+          <td>{{ job.location }}</td>
+          <td><span class="pill">{{ job.display_status }}</span></td>
+          <td>{{ job.provider }}</td>
+          <td>{{ job.discovered_at }}</td>
+          <td>
+            <div class="actions">
+              <a class="button" href="/jobs/{{ job.id }}">Show details</a>
+              <form method="post" action="/jobs/{{ job.id }}/save?next={{ '/' | urlencode }}">
+                <button class="secondary" type="submit">Save</button>
+              </form>
+              <form method="post" action="/jobs/{{ job.id }}/skip?next={{ '/' | urlencode }}">
+                <button class="danger" type="submit">Skip</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

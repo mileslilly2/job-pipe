@@ -17,6 +17,19 @@ ApplicationStatus = Literal[
     "archived",
 ]
 
+RecommendationType = Literal["apply", "maybe", "skip"]
+SeniorityLevel = Literal[
+    "entry_level",
+    "junior",
+    "mid",
+    "apprenticeship",
+    "contractor",
+    "senior",
+    "manager",
+    "director",
+    "unknown",
+]
+
 
 class ProjectItem(BaseModel):
     name: str
@@ -68,6 +81,61 @@ class RolePack(BaseModel):
     answer_angles: dict[str, list[str]] = Field(default_factory=dict)
 
 
+class SearchProfile(BaseModel):
+    name: str
+    active_goal: str | None = None
+    preferred: list[str] = Field(default_factory=list)
+    acceptable: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    target_role_families: list[str] = Field(default_factory=list)
+    excluded_role_families: list[str] = Field(default_factory=list)
+    positive_keywords: list[str] = Field(default_factory=list)
+    negative_keywords: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    allowed_locations: list[str] = Field(default_factory=list)
+    excluded_locations: list[str] = Field(default_factory=list)
+    preferred_work_styles: list[str] = Field(default_factory=list)
+    preferred_role_levels: list[str] = Field(default_factory=list)
+    excluded_levels: list[str] = Field(default_factory=list)
+
+
+class JobFacts(BaseModel):
+    role_family: str = "unknown"
+    skills_required: list[str] = Field(default_factory=list)
+    skills_preferred: list[str] = Field(default_factory=list)
+    experience_min_years: int | None = None
+    seniority: str = "unknown"
+    remote: bool = False
+
+
+class ProfileFacts(BaseModel):
+    preferred_role_families: list[str] = Field(default_factory=list)
+    acceptable_role_families: list[str] = Field(default_factory=list)
+    avoid_role_families: list[str] = Field(default_factory=list)
+    skills_preferred: list[str] = Field(default_factory=list)
+    skills_avoided: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    allowed_locations: list[str] = Field(default_factory=list)
+    excluded_locations: list[str] = Field(default_factory=list)
+    preferred_work_styles: list[str] = Field(default_factory=list)
+    preferred_role_levels: list[str] = Field(default_factory=list)
+    excluded_levels: list[str] = Field(default_factory=list)
+    experience_max_years: int | None = None
+
+
+class FactReport(BaseModel):
+    job: JobFacts
+    profile: ProfileFacts | None = None
+    matched: list[str] = Field(default_factory=list)
+    missing_mismatched: list[str] = Field(default_factory=list)
+    concerns: list[str] = Field(default_factory=list)
+    score_adjustment: int = 0
+
+    @property
+    def notes(self) -> list[str]:
+        return self.matched + self.missing_mismatched + self.concerns
+
+
 class ParsedJob(BaseModel):
     source_url: str | None = None
     title: str = ""
@@ -80,15 +148,43 @@ class ParsedJob(BaseModel):
     raw_text: str = ""
 
 
+class JobSource(BaseModel):
+    provider: str
+    company: str = ""
+    company_slug: str = ""
+    board_token: str | None = None
+    account: str | None = None
+    target_role_families: list[str] = Field(default_factory=list)
+    include_keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class DiscoveredJob(BaseModel):
+    provider: str
+    external_id: str
+    company: str
+    title: str
+    location: str = ""
+    remote: bool = False
+    apply_url: str = ""
+    description: str = ""
+    posted_at: str | None = None
+    source_url: str | None = None
+
+
 class JobAnalysis(BaseModel):
     role_type: str
     seniority_level: str
     fit_score: int
     risk_score: int
     quality_score: int
+    recommendation: str = "maybe"
+    skip_reason: str | None = None
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     red_flags: list[str] = Field(default_factory=list)
+    eligibility_flags: list[str] = Field(default_factory=list)
     notes: str = ""
 
 
@@ -110,5 +206,14 @@ class TailorResult(BaseModel):
 
 class PacketContext(BaseModel):
     recommendation: str
-    rationale: str
+    reason: str | None = None
+    explanation: str
     concerns: list[str] = Field(default_factory=list)
+
+
+class FeedbackEvent(BaseModel):
+    job_id: int
+    action: str
+    reason_codes: list[str] = Field(default_factory=list)
+    note: str | None = None
+    created_at: str | None = None

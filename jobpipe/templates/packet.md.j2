@@ -8,13 +8,17 @@ Source: {{ job.source_url }}
 
 ## Verdict
 
+Recommendation: {{ packet.recommendation | title }}
+{% if packet.reason %}
+Reason: {{ packet.reason | replace('_', ' ') | title }}
+{% endif %}
 Fit score: {{ analysis.fit_score }}/100
 Risk score: {{ analysis.risk_score }}/100
 Quality score: {{ analysis.quality_score }}/100
+Role family: {{ analysis.role_type }}
+Seniority: {{ analysis.seniority_level }}
 
-Recommendation: {{ packet.recommendation }}
-
-{{ packet.rationale }}
+{{ packet.explanation }}
 
 ## Why this fits
 

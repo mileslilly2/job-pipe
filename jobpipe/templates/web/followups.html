@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Follow-ups</h2>
+  <div class="muted">Due and overdue follow-ups pulled from the existing application tracker.</div>
+</section>
+
+<section class="card">
+  {% if jobs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Follow-up</th>
+          <th>Status</th>
+          <th>Recommendation</th>
+          <th>Reason</th>
+          <th>Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for job in jobs %}
+        <tr>
+          <td>{{ job.company }}</td>
+          <td>{{ job.title }}</td>
+          <td>{{ job.followup_at }}</td>
+          <td><span class="pill">{{ job.status }}</span></td>
+          <td>{{ job.recommendation }}</td>
+          <td>{{ job.skip_reason }}</td>
+          <td>{{ job.notes }}</td>
+          <td><a class="button" href="/jobs/{{ job.id }}">Show details</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="muted">No due follow-ups right now.</div>
+  {% endif %}
+</section>
+{% endblock %}
