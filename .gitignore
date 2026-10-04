@@ -2,6 +2,7 @@
 jobpipe.db
 *.db-journal
 .pytest_cache/
+diagnostics/
 __pycache__/
 *.py[cod]
 

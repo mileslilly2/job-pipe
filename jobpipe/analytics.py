@@ -53,7 +53,7 @@ def build_analytics_report(*, high_fit_threshold: int = HIGH_FIT_THRESHOLD, top_
         'saved_not_packaged': sum(1 for job in jobs if str(job.get('review_status') or '').strip().lower() == 'saved' and not job['has_package']),
         'packaged_not_applied': sum(1 for job in jobs if job['has_package'] and _display_status(job) != 'applied'),
         'followups_due': len(due_followups(limit=1000)),
-        'high_fit_jobs': sum(1 for job in jobs if int(job.get('score') or 0) >= high_fit_threshold),
+        'high_fit_jobs': sum(1 for job in jobs if _is_high_fit_active(job, high_fit_threshold)),
         'active_jobs': sum(1 for job in jobs if _is_active_job(job)),
         "goal_satisfying_jobs": sum(1 for job in jobs if int(job.get("goal_modifier") or 0) > 0),
     }
@@ -138,7 +138,7 @@ def _top_role_families_by_score(jobs: list[dict[str, Any]]) -> list[dict[str, An
                 'role_family': family,
                 'count': len(scores),
                 'average_score': round(sum(scores) / len(scores), 1),
-                'high_fit_count': sum(1 for score in scores if score >= HIGH_FIT_THRESHOLD),
+                'high_fit_count': sum(1 for job in jobs if str(job.get('role_type') or '').strip() == family and _is_high_fit_active(job, HIGH_FIT_THRESHOLD)),
             }
             for family, scores in grouped.items()
         ),
@@ -150,11 +150,9 @@ def _top_role_families_by_score(jobs: list[dict[str, Any]]) -> list[dict[str, An
 def _top_sources_by_high_fit_jobs(jobs: list[dict[str, Any]], *, high_fit_threshold: int) -> list[dict[str, Any]]:
     grouped: dict[str, list[int]] = defaultdict(list)
     for job in jobs:
-        if not _is_active_job(job):
+        if not _is_high_fit_active(job, high_fit_threshold):
             continue
         score = int(job.get('score') or 0)
-        if score < high_fit_threshold:
-            continue
         grouped[_source_label(job)].append(score)
     ranked = sorted(
         (
@@ -217,6 +215,10 @@ def _is_actionable(job: dict[str, Any]) -> bool:
     if recommendation == 'skip':
         return False
     return True
+
+
+def _is_high_fit_active(job: dict[str, Any], threshold: int) -> bool:
+    return _is_active_job(job) and int(job.get("score") or 0) >= threshold
 
 
 def _is_active_job(job: dict[str, Any]) -> bool:

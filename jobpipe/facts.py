@@ -13,7 +13,7 @@ NEGATIVE_ROLE_FAMILY_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("data_products", ("data products",)),
     ("help_desk", ("help desk", "helpdesk", "service desk", "desk support")),
     ("customer_support", ("customer support", "customer success", "client support", "customer care")),
-    ("technical_support", ("it support", "technical support", "support engineer", "desktop support", "systems support")),
+    ("technical_support", ("technical solutions engineer", "it support", "technical support", "support engineer", "desktop support", "systems support")),
     ("physician", ("physician", "medical doctor", "doctor", "surgeon")),
     ("truck_driver", ("truck driver", "cdl driver", "commercial driver")),
     ("sales", ("business development", "account executive", "sales", "sdr", "bdr", "solutions consultant")),
@@ -112,6 +112,20 @@ UNCLEAR_LOCATION_TERMS = ("unknown", "tbd", "anywhere", "worldwide", "nationwide
 
 def classify_role_family(job: Any) -> tuple[str, list[str], str | None]:
     text = _job_text(job).lower()
+    title = (_field(job, "title") or "").lower()
+    # Explicit title-family phrases must outrank noisy description terms.
+    if _has_any(title, ["recruiter", "recruiting", "payroll", "paralegal", "designer", "account executive"]):
+        return "unknown", [], "explicit non-technical title family"
+    for family, phrases in POSITIVE_ROLE_FAMILY_RULES:
+        matched = [phrase for phrase in phrases if _has_phrase(title, phrase)]
+        if matched:
+            if family == "technical_operations" and not _has_programming_signals(text):
+                return "unknown", [], "technical operations signals ignored: not programming-heavy"
+            return family, matched, None
+    for family, phrases in NEGATIVE_ROLE_FAMILY_RULES:
+        matched = [phrase for phrase in phrases if _has_phrase(title, phrase)]
+        if matched:
+            return family, matched, None
     for family, phrases in NEGATIVE_ROLE_FAMILY_RULES:
         matched = [phrase for phrase in phrases if _has_phrase(text, phrase)]
         if matched:

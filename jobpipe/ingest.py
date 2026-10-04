@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 import re
 from pathlib import Path
 from urllib.error import URLError
@@ -9,6 +10,7 @@ from urllib.request import Request, urlopen
 from .catalog import load_search_profile, normalize_job_source
 from .classify import detect_seniority
 from .models import DiscoveredJob, JobSource, ParsedJob, SearchProfile
+from .catalog import source_identity_label
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .score import classify_role_family
@@ -80,6 +82,59 @@ TITLE_SIGNAL_KEYWORDS = [
     "platform",
     "evaluation",
 ]
+
+
+@dataclass(frozen=True)
+class FilterDecision:
+    """Deterministic outcome of the existing source/profile eligibility rules."""
+
+    accepted: bool
+    reason_codes: tuple[str, ...]
+    role_family: str
+    seniority: str
+    matched_positive_keywords: tuple[str, ...] = ()
+    matched_negative_keywords: tuple[str, ...] = ()
+    missing_required_signals: tuple[str, ...] = ()
+
+
+@dataclass
+class SourceDiscoveryReport:
+    source: JobSource
+    status: str
+    fetched_count: int = 0
+    passed_count: int = 0
+    rejected_count: int = 0
+    reason_counts: Counter[str] = field(default_factory=Counter)
+    role_family_counts: Counter[str] = field(default_factory=Counter)
+    rejected_role_family_counts: Counter[str] = field(default_factory=Counter)
+    rejected_jobs: list[tuple[DiscoveredJob, FilterDecision]] = field(default_factory=list)
+    accepted_jobs: list[DiscoveredJob] = field(default_factory=list)
+    error: str | None = None
+
+    @property
+    def label(self) -> str:
+        return source_identity_label(self.source)
+
+
+@dataclass
+class DiscoveryDiagnostics:
+    source_reports: list[SourceDiscoveryReport] = field(default_factory=list)
+
+    @property
+    def fetched_count(self) -> int:
+        return sum(report.fetched_count for report in self.source_reports)
+
+    @property
+    def passed_count(self) -> int:
+        return sum(report.passed_count for report in self.source_reports)
+
+    @property
+    def rejected_count(self) -> int:
+        return sum(report.rejected_count for report in self.source_reports)
+
+    @property
+    def reason_counts(self) -> Counter[str]:
+        return Counter({key: sum(report.reason_counts[key] for report in self.source_reports) for key in {reason for report in self.source_reports for reason in report.reason_counts}})
 
 
 @dataclass(frozen=True)
@@ -168,6 +223,41 @@ def discover_jobs_from_sources(sources: list[JobSource], profile: SearchProfile 
     return jobs
 
 
+def collect_discovery_diagnostics(
+    sources: list[JobSource],
+    profile: SearchProfile | None = None,
+    *,
+    include_disabled: bool = False,
+) -> DiscoveryDiagnostics:
+    """Fetch and evaluate sources in memory without persisting rejected jobs."""
+    active_profile = profile or load_search_profile()
+    reports: list[SourceDiscoveryReport] = []
+    for source in sources:
+        if not source.enabled:
+            if include_disabled:
+                reports.append(SourceDiscoveryReport(source=source, status="not_run_disabled"))
+            continue
+        try:
+            discovered = discover_provider_jobs(source)
+        except Exception as exc:  # pragma: no cover - provider/network guard
+            reports.append(SourceDiscoveryReport(source=source, status="failed", error=str(exc)))
+            continue
+        report = SourceDiscoveryReport(source=source, status="success", fetched_count=len(discovered))
+        for job in discovered:
+            decision = evaluate_discovered_job(job, source, active_profile)
+            report.role_family_counts[decision.role_family or "unknown"] += 1
+            if decision.accepted:
+                report.passed_count += 1
+                report.accepted_jobs.append(job)
+            else:
+                report.rejected_count += 1
+                report.reason_counts.update(decision.reason_codes)
+                report.rejected_role_family_counts[decision.role_family or "unknown"] += 1
+                report.rejected_jobs.append((job, decision))
+        reports.append(report)
+    return DiscoveryDiagnostics(reports)
+
+
 def filter_discovered_jobs(jobs: list[DiscoveredJob], source: JobSource, profile: SearchProfile | None = None) -> list[DiscoveredJob]:
     active_profile = profile or load_search_profile()
     include_keywords = _explicit_keywords(source.include_keywords)
@@ -175,11 +265,17 @@ def filter_discovered_jobs(jobs: list[DiscoveredJob], source: JobSource, profile
     target_role_families = _effective_role_families(source.target_role_families, active_profile.preferred + active_profile.acceptable)
     profile_keywords = _explicit_keywords(active_profile.positive_keywords)
     profile_negative_keywords = _explicit_keywords(active_profile.negative_keywords)
-    filtered: list[DiscoveredJob] = []
-    for job in jobs:
-        if _job_matches_source(job, target_role_families, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords, active_profile.excluded_levels, active_profile.avoid):
-            filtered.append(job)
-    return filtered
+    return [
+        job for job in jobs
+        if evaluate_discovered_job(
+            job, source, active_profile,
+            target_role_families=target_role_families,
+            include_keywords=include_keywords,
+            exclude_keywords=exclude_keywords,
+            profile_keywords=profile_keywords,
+            profile_negative_keywords=profile_negative_keywords,
+        ).accepted
+    ]
 
 
 def _normalize_job_source(source: JobSource) -> JobSource:
@@ -202,6 +298,50 @@ def _effective_role_families(explicit: list[str], profile_role_families: list[st
     return values or [value.strip().lower() for value in (profile_role_families or DEFAULT_TARGET_ROLE_FAMILIES) if value and value.strip()]
 
 
+def evaluate_discovered_job(
+    job: DiscoveredJob,
+    source: JobSource,
+    profile: SearchProfile | None = None,
+    *,
+    target_role_families: list[str] | None = None,
+    include_keywords: list[str] | None = None,
+    exclude_keywords: list[str] | None = None,
+    profile_keywords: list[str] | None = None,
+    profile_negative_keywords: list[str] | None = None,
+) -> FilterDecision:
+    """Evaluate every current filter rule and return deterministic reason codes."""
+    active_profile = profile or load_search_profile()
+    include = include_keywords if include_keywords is not None else _explicit_keywords(source.include_keywords)
+    exclude = exclude_keywords if exclude_keywords is not None else _effective_keywords(source.exclude_keywords, DEFAULT_EXCLUDE_KEYWORDS)
+    targets = target_role_families if target_role_families is not None else _effective_role_families(source.target_role_families, active_profile.preferred + active_profile.acceptable)
+    positive = profile_keywords if profile_keywords is not None else _explicit_keywords(active_profile.positive_keywords)
+    negative = profile_negative_keywords if profile_negative_keywords is not None else _explicit_keywords(active_profile.negative_keywords)
+    family, _matched, _reason = classify_role_family(job)
+    parsed_job = ParsedJob(title=job.title, company=job.company, location=job.location, description=job.description)
+    seniority, _flags = detect_seniority(parsed_job)
+    text = " ".join([job.title, job.company, job.location, job.description]).lower()
+    reasons: list[str] = []
+    if family not in targets:
+        reasons.append("role_family_not_targeted")
+    if family in {value.strip().lower() for value in active_profile.avoid if value and value.strip()}:
+        reasons.append("role_family_avoided")
+    if seniority in {level.strip().lower() for level in active_profile.excluded_levels if level and level.strip()}:
+        reasons.append("seniority_excluded")
+    if any(_phrase_in_text(text, term) for term in negative):
+        reasons.append("profile_negative_keyword")
+    if not _has_title_signal(job, family, include, positive):
+        reasons.append("missing_title_signal")
+    required_keywords = include or positive
+    if required_keywords and not any(_phrase_in_text(text, term) for term in required_keywords):
+        reasons.append("keyword_requirement_missing")
+    if any(_phrase_in_text(text, term) for term in exclude):
+        reasons.append("keyword_excluded")
+    positive_matches = tuple(term for term in required_keywords if _phrase_in_text(text, term))
+    negative_matches = tuple(term for term in list(exclude) + list(negative) if _phrase_in_text(text, term))
+    missing_signals = tuple(reason for reason in reasons if reason in {"missing_title_signal", "keyword_requirement_missing"})
+    return FilterDecision(not reasons, tuple(reasons), family, seniority, positive_matches, negative_matches, missing_signals)
+
+
 def _job_matches_source(
     job: DiscoveredJob,
     target_role_families: list[str],
@@ -212,17 +352,9 @@ def _job_matches_source(
     excluded_levels: list[str],
     avoid_role_families: list[str],
 ) -> bool:
-    family, _matched, _reason = classify_role_family(job)
-    if family not in target_role_families:
-        return False
-    if family in {value.strip().lower() for value in avoid_role_families if value and value.strip()}:
-        return False
-    if _job_matches_profile(job, profile_negative_keywords, excluded_levels):
-        return False
-    if not _has_title_signal(job, family, include_keywords, profile_keywords):
-        return False
-    return _job_matches_keywords(job, include_keywords, exclude_keywords, profile_keywords, profile_negative_keywords)
-
+    profile = SearchProfile(name="filter", preferred=[], acceptable=[], avoid=avoid_role_families, positive_keywords=profile_keywords, negative_keywords=profile_negative_keywords, excluded_levels=excluded_levels)
+    source = JobSource(provider=job.provider, target_role_families=target_role_families, include_keywords=include_keywords, exclude_keywords=exclude_keywords)
+    return evaluate_discovered_job(job, source, profile).accepted
 
 def _job_matches_keywords(
     job: DiscoveredJob,

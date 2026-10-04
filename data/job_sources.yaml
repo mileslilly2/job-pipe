@@ -99,7 +99,7 @@
   - junior_software_engineer
   include_keywords: []
   exclude_keywords: []
-  enabled: true
+  enabled: false
 - provider: greenhouse
   company: Notion
   company_slug: notion
@@ -110,7 +110,7 @@
   - python_automation
   include_keywords: []
   exclude_keywords: []
-  enabled: true
+  enabled: false
 - provider: greenhouse
   company: OpenAI
   company_slug: openai
@@ -121,7 +121,7 @@
   - software_engineer
   include_keywords: []
   exclude_keywords: []
-  enabled: true
+  enabled: false
 - provider: greenhouse
   company: Anthropic
   company_slug: anthropic
@@ -154,4 +154,4 @@
   - software_engineer
   include_keywords: []
   exclude_keywords: []
-  enabled: true
+  enabled: false

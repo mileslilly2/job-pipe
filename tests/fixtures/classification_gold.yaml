@@ -1,0 +1,32 @@
+titles:
+  - title: "Staff + Senior Software Engineer, Inference Infrastructure"
+    expected_role: software_engineering
+    expected_seniority: staff
+    notes: explicit software-engineer and staff title signals
+  - title: "Senior Backend Engineer (Python), Agent Developer: Flow Components"
+    expected_role: backend_api
+    expected_seniority: senior
+  - title: "Growth Recruiter, High Volume - Contract"
+    expected_role: other
+    expected_seniority: unsure
+  - title: "University Recruiter, Contract"
+    expected_role: other
+    expected_seniority: unsure
+  - title: "Global Payroll Analyst"
+    expected_role: other
+    expected_seniority: unknown
+  - title: "Technical Solutions Engineer"
+    expected_role: technical_support
+    expected_seniority: unknown
+  - title: "Software Engineer Intern (Winter 2027)"
+    expected_role: software_engineering
+    expected_seniority: intern
+  - title: "Recruiter, French Speaking (London, United Kingdom)"
+    expected_role: other
+    expected_seniority: unknown
+  - title: "Backend Engineer, AI Security"
+    expected_role: backend_api
+    expected_seniority: unknown
+  - title: "Full Stack Engineer, Web Presence and Platform"
+    expected_role: full_stack
+    expected_seniority: unknown

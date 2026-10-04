@@ -81,7 +81,7 @@ python_backend:
       - backend_api
       - software_engineer
       - junior_software_engineer
-    enabled: true
+    enabled: false
   - provider: greenhouse
     company: Notion
     company_slug: notion
@@ -90,7 +90,7 @@ python_backend:
       - backend_api
       - software_engineer
       - python_automation
-    enabled: true
+    enabled: false
 
 developer_tools:
   - provider: greenhouse
@@ -157,7 +157,7 @@ ai_eval:
       - ai_evaluation
       - backend_api
       - software_engineer
-    enabled: true
+    enabled: false
   - provider: greenhouse
     company: Anthropic
     company_slug: anthropic
@@ -184,7 +184,7 @@ ai_eval:
       - ai_evaluation
       - backend_api
       - software_engineer
-    enabled: true
+    enabled: false
 
 remote_friendly:
   - provider: greenhouse
@@ -251,7 +251,7 @@ startups:
       - junior_software_engineer
       - software_engineer
       - backend_api
-    enabled: true
+    enabled: false
   - provider: greenhouse
     company: Notion
     company_slug: notion
@@ -260,7 +260,7 @@ startups:
       - junior_software_engineer
       - software_engineer
       - backend_api
-    enabled: true
+    enabled: false
   - provider: greenhouse
     company: PostHog
     company_slug: posthog

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from jobpipe.analytics import build_analytics_report
+from jobpipe.analytics import build_analytics_report, _top_role_families_by_score, _top_sources_by_high_fit_jobs
 from jobpipe.cli import app
 from jobpipe.db import insert_job, set_followup_at, upsert_analysis
 from jobpipe.tracker import update_status
@@ -71,3 +71,15 @@ def test_analytics_aggregates_cli_and_web_metrics(initialized_workspace, runner)
     assert "Analytics Summary" in result.stdout
     assert "Top 10 Jobs to Apply Today" in result.stdout
     assert "Applications today" in result.stdout
+
+
+def test_high_fit_aggregates_use_one_active_predicate() -> None:
+    jobs = [
+        {"id": 1, "role_type": "backend_api", "score": 80, "status": None, "review_status": "new", "provider": "greenhouse", "company": "Acme"},
+        {"id": 2, "role_type": "backend_api", "score": 90, "status": None, "review_status": "skipped", "provider": "greenhouse", "company": "Acme"},
+        {"id": 3, "role_type": "full_stack", "score": 75, "status": None, "review_status": "new", "provider": "lever", "company": "Beta"},
+    ]
+    families = _top_role_families_by_score(jobs)
+    assert sum(item["high_fit_count"] for item in families) == 2
+    sources = _top_sources_by_high_fit_jobs(jobs, high_fit_threshold=70)
+    assert sum(item["count"] for item in sources) == 2

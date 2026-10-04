@@ -35,7 +35,9 @@ from .db import (
     upsert_packet_paths,
 )
 from .export import export_tracker_csv
-from .ingest import filter_discovered_jobs, ingest_text_file, ingest_url, load_job_sources, resolve_job_sources
+from .false_negative import sample_rejected_jobs, summarize_audit, write_audit_artifacts
+from .classification_audit import load_review_sample, load_gold, audit_records, write_audit
+from .ingest import collect_discovery_diagnostics, filter_discovered_jobs, ingest_text_file, ingest_url, load_job_sources, resolve_job_sources
 from .learn import load_learned_weights, sync_weights
 from .knowledge import available_goals, require_goal
 from .models import CandidateProfile, FeedbackEvent, JobAnalysis, JobSource, ParsedJob, RolePack
@@ -43,13 +45,21 @@ from .packet import build_packet_context
 from .parse import parse_job_text
 from .providers import discover_jobs as discover_provider_jobs
 from .recommend import make_recommendation
-from .analytics import build_analytics_report
+from .analytics import build_analytics_report, _display_status
 from .score import score_fit, score_job_fit_v1, score_job_fit_breakdown, score_quality, score_risk
 from .tailor import tailor_job
 from .tracker import ALLOWED_STATUSES, due_followups, update_status
 from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, package_dir, root_dir, slugify
 
 app = typer.Typer(help="Application cockpit for repetitive job applications.")
+
+@app.command("classification-audit")
+def classification_audit(sample: Path = typer.Option(Path("diagnostics/false_negative_review.md"), "--sample"), gold: Path = typer.Option(Path("tests/fixtures/classification_gold.yaml"), "--gold"), output: Path = typer.Option(Path("diagnostics/classification_audit.json"), "--output")) -> None:
+    records = load_review_sample(sample)
+    report = audit_records(records, load_gold(gold))
+    write_audit(report, output)
+    console.print(f"Classification audit: {report['sample_size']} sampled; role {report['correct_roles']}/{report['labeled_roles']} ({report['role_accuracy']:.1%}); seniority {report['correct_seniority']}/{report['labeled_seniority']} ({report['seniority_accuracy']:.1%})")
+    console.print(f"Artifact: {output}")
 profiles_app = typer.Typer(help="Manage search profiles.")
 sources_app = typer.Typer(help="Manage configured job sources.")
 goal_app = typer.Typer(help="View or change the active search goal.")
@@ -279,6 +289,91 @@ def _print_fact_section(title: str, items: list[str]) -> None:
         console.print("- None")
 
 
+def _print_false_negative_audit(records, summary, paths) -> None:
+    console.print(f"False-negative audit sample: {summary['sample_size']}")
+    console.print(f"  clearly_correct_rejection: {summary['clearly_correct_rejections']}")
+    console.print(f"  plausible_false_negative: {summary['plausible_false_negatives']} ({summary["provisional_false_negative_rate"]:.1%})")
+    console.print(f"  needs_human_review: {summary['needs_human_review']} (review-needed {summary["review_needed_rate"]:.1%})")
+    for title, key in (("False negatives by reason", "false_negatives_by_reason"), ("False negatives by source", "false_negatives_by_source"), ("False negatives by role family", "false_negatives_by_role_family"), ("False negatives by seniority", "false_negatives_by_seniority")):
+        console.print(title + ":")
+        for name, count in sorted(summary[key].items(), key=lambda item: (-item[1], item[0])):
+            console.print(f"- {name}: {count}")
+    console.print(f"Artifacts: {paths[0]}, {paths[1]}")
+
+
+def _print_discovery_diagnostics(diagnostics, *, active_counts: Counter[tuple[str, str]] | None = None) -> None:
+    reasons = Table(title="Discovery Rejections by Reason")
+    reasons.add_column("Reason")
+    reasons.add_column("Count")
+    for reason, count in diagnostics.reason_counts.most_common():
+        reasons.add_row(reason, str(count))
+    console.print(reasons)
+
+    sources = Table(title="Discovery Source Health")
+    for column in ("Provider", "Company", "Enabled", "Fetch", "Fetched", "Passed", "Rejected", "Active DB", "Error"):
+        sources.add_column(column)
+    for report in diagnostics.source_reports:
+        source = report.source
+        active = (active_counts or Counter()).get((source.provider, source.company), 0)
+        sources.add_row(source.provider, source.company, "yes" if source.enabled else "no", report.status, str(report.fetched_count), str(report.passed_count), str(report.rejected_count), str(active), report.error or "")
+    console.print(sources)
+
+    source_reasons = Table(title="Rejections by Source and Reason")
+    for column in ("Provider", "Company", "Reason", "Count"):
+        source_reasons.add_column(column)
+    for report in diagnostics.source_reports:
+        for reason, count in report.reason_counts.most_common():
+            source_reasons.add_row(report.source.provider, report.source.company, reason, str(count))
+    console.print(source_reasons)
+
+    families = Counter()
+    for report in diagnostics.source_reports:
+        families.update(report.rejected_role_family_counts)
+    family_table = Table(title="Rejected Jobs by Detected Role Family")
+    family_table.add_column("Role Family")
+    family_table.add_column("Rejected")
+    for family, count in families.most_common():
+        family_table.add_row(family, str(count))
+    console.print(family_table)
+
+
+def _active_source_counts() -> Counter[tuple[str, str]]:
+    counts: Counter[tuple[str, str]] = Counter()
+    for row in db_list_jobs():
+        if _display_status(dict(row)) not in {"rejected", "skipped", "archived", "ignored"}:
+            counts[(str(row["provider"] or "manual"), str(row["company"] or "unknown company"))] += 1
+    return counts
+
+
+def _print_corpus_concentration() -> None:
+    rows = db_list_jobs()
+    active_counts = _active_source_counts()
+    total = sum(active_counts.values())
+    companies = Table(title="Active Corpus by Source and Company")
+    for column in ("Provider", "Company", "Active", "Corpus %", "Concentrated"):
+        companies.add_column(column)
+    for (provider, company), count in sorted(active_counts.items(), key=lambda item: (-item[1], item[0])):
+        companies.add_row(provider, company, str(count), f"{(count / total) if total else 0:.1%}", "yes" if total and count / total >= 0.5 else "")
+    console.print(companies)
+
+    providers = Counter()
+    roles = Counter()
+    for row in rows:
+        provider = str(row["provider"] or "manual")
+        company = str(row["company"] or "unknown company")
+        if (provider, company) not in active_counts:
+            continue
+        providers[provider] += 1
+        roles[str(row["primary_role_family"] or row["role_type"] or "unknown")] += 1
+    for title, counts in (("Active Corpus by Provider", providers), ("Active Corpus by Canonical Role Family", roles)):
+        table = Table(title=title)
+        table.add_column("Group")
+        table.add_column("Active")
+        for name, count in counts.most_common():
+            table.add_row(name, str(count))
+        console.print(table)
+
+
 def _print_analytics_report(report) -> None:
     summary = Table(title="Analytics Summary")
     summary.add_column("Metric")
@@ -481,7 +576,7 @@ def add_url(url: str) -> None:
 
 
 @app.command("ingest")
-def ingest() -> None:
+def ingest(diagnostics: bool = typer.Option(False, "--diagnostics", help="Print deterministic source and filter diagnostics."), false_negative_audit: bool = typer.Option(False, "--false-negative-audit", help="Sample rejected jobs for deterministic false-negative review.")) -> None:
     _ensure_workspace()
     active_profile = _load_active_profile()
     source_config = resolve_job_sources(data_dir() / "job_sources.yaml")
@@ -494,20 +589,15 @@ def ingest() -> None:
     else:
         console.print("Using configured job sources from data/job_sources.yaml.")
     console.print(f"Using active search profile {active_profile.name}.")
-    fetched = 0
+    report = collect_discovery_diagnostics(sources, active_profile)
     inserted = 0
     updated = 0
-    filtered_out = 0
-    for source in sources:
-        try:
-            discovered = discover_provider_jobs(source)
-            fetched += len(discovered)
-        except Exception as exc:  # pragma: no cover - defensive CLI guard
-            console.print(f"[red]Failed to ingest {source.provider}:{source.company or source.company_slug or source.board_token or source.account}[/red] {exc}")
+    for source_report in report.source_reports:
+        if source_report.status == "failed":
+            source = source_report.source
+            console.print(f"[red]Failed to ingest {source.provider}:{source.company or source.company_slug or source.board_token or source.account}[/red] {source_report.error}")
             continue
-        filtered = filter_discovered_jobs(discovered, source, active_profile)
-        filtered_out += max(len(discovered) - len(filtered), 0)
-        for job in filtered:
+        for job in source_report.accepted_jobs:
             payload = job.model_dump()
             payload["fit_score"], _notes = score_job_fit_v1(payload, profile=active_profile)
             payload["status"] = "new"
@@ -517,7 +607,14 @@ def ingest() -> None:
                 inserted += 1
             else:
                 updated += 1
-    console.print(f"Fetched {fetched} job(s). Filtered out {filtered_out} job(s). Inserted {inserted} new job(s). Updated {updated} existing job(s).")
+    console.print(f"Fetched {report.fetched_count} job(s). Filtered out {report.rejected_count} job(s). Inserted {inserted} new job(s). Updated {updated} existing job(s).")
+    if diagnostics or false_negative_audit:
+        _print_discovery_diagnostics(report, active_counts=_active_source_counts())
+    if false_negative_audit:
+        records = sample_rejected_jobs(report, active_goal=active_profile.active_goal)
+        summary = summarize_audit(records)
+        paths = write_audit_artifacts(records)
+        _print_false_negative_audit(records, summary, paths)
 
 
 @app.command("list")
@@ -1249,6 +1346,19 @@ def sources_import_pack(category: str) -> None:
         imported += 1
     _write_job_sources_records(path, sources)
     console.print(f"Imported source pack {category}: {imported} added, {skipped} skipped.")
+
+
+@sources_app.command("audit")
+def sources_audit() -> None:
+    """Fetch configured sources without changing jobs and explain funnel/corpus coverage."""
+    _ensure_workspace()
+    sources = _load_job_sources_records(_job_sources_path())
+    if not sources:
+        console.print("No job sources configured.")
+        return
+    report = collect_discovery_diagnostics(sources, _load_active_profile(), include_disabled=True)
+    _print_discovery_diagnostics(report, active_counts=_active_source_counts())
+    _print_corpus_concentration()
 
 
 @sources_app.command("test")
