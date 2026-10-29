@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .browser import copy_file, open_path, open_url
 from .application_package import application_package_paths, build_application_package
+from . import services
 from .catalog import load_search_profile, load_search_profiles, load_source_pack, load_source_packs, normalize_job_source, save_search_profiles, source_identity, source_identity_label
 from .facts import build_fact_report
 from .classify import classify_job, detect_seniority
@@ -49,6 +50,8 @@ from .analytics import build_analytics_report, _display_status
 from .score import score_fit, score_job_fit_v1, score_job_fit_breakdown, score_quality, score_risk
 from .tailor import tailor_job
 from .tracker import ALLOWED_STATUSES, due_followups, update_status
+from .source_metrics import build_source_metrics, catalog_sources, completed_runs, finish_ingest_run, record_source_run, run_stats, start_ingest_run
+from .source_display import print_concentration, print_corpus, print_history, print_packs, print_run, print_trial
 from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, package_dir, root_dir, slugify
 
 app = typer.Typer(help="Application cockpit for repetitive job applications.")
@@ -182,12 +185,19 @@ def _active_source_state(source: JobSource) -> str:
     return "active" if source.enabled else "disabled"
 
 
-def _source_identity_key(source: JobSource) -> tuple[str, str]:
-    provider = (source.provider or "").strip().lower()
-    company_slug = (source.company_slug or "").strip().lower()
-    if not company_slug:
-        company_slug = slugify(source.company or source.board_token or source.account or provider)
-    return provider, company_slug
+def _source_identity_key(source: JobSource) -> str:
+    return source_identity_label(source)
+
+
+def _source_catalog() -> tuple[list[JobSource], dict[str, list[JobSource]]]:
+    sources = catalog_sources(_job_sources_path(), package_dir() / "data" / "job_sources.yaml")
+    return sources, load_source_packs().packs
+
+
+def _source_metrics_report():
+    sources, packs = _source_catalog()
+    catalog = sources + [source for members in packs.values() for source in members]
+    return build_source_metrics(catalog), sources, packs
 
 
 def _render_template(template_name: str, context: dict) -> str:
@@ -195,10 +205,7 @@ def _render_template(template_name: str, context: dict) -> str:
 
 
 def _score_notes(job_row, profile=None) -> tuple[int, list[str]]:
-    learned_weights = load_learned_weights()
-    active_profile = profile or _load_active_profile()
-    score, notes = score_job_fit_v1(dict(job_row), learned_weights=learned_weights, profile=active_profile)
-    return score, notes
+    return services.job_score(job_row, profile=profile or _load_active_profile())
 
 
 def _print_job_details(job_row, profile=None) -> None:
@@ -301,7 +308,7 @@ def _print_false_negative_audit(records, summary, paths) -> None:
     console.print(f"Artifacts: {paths[0]}, {paths[1]}")
 
 
-def _print_discovery_diagnostics(diagnostics, *, active_counts: Counter[tuple[str, str]] | None = None) -> None:
+def _print_discovery_diagnostics(diagnostics, *, active_counts: Counter[str] | None = None) -> None:
     reasons = Table(title="Discovery Rejections by Reason")
     reasons.add_column("Reason")
     reasons.add_column("Count")
@@ -309,21 +316,23 @@ def _print_discovery_diagnostics(diagnostics, *, active_counts: Counter[tuple[st
         reasons.add_row(reason, str(count))
     console.print(reasons)
 
-    sources = Table(title="Discovery Source Health")
-    for column in ("Provider", "Company", "Enabled", "Fetch", "Fetched", "Passed", "Rejected", "Active DB", "Error"):
-        sources.add_column(column)
+    sources = Table(title="Discovery Source Health", padding=(0, 0))
+    for column in ("Source", "Fetch", "Fetched", "Passed", "Rejected", "Active DB"):
+        sources.add_column(column, no_wrap=True)
     for report in diagnostics.source_reports:
         source = report.source
-        active = (active_counts or Counter()).get((source.provider, source.company), 0)
-        sources.add_row(source.provider, source.company, "yes" if source.enabled else "no", report.status, str(report.fetched_count), str(report.passed_count), str(report.rejected_count), str(active), report.error or "")
+        active = (active_counts or Counter()).get(report.label, 0)
+        sources.add_row(report.label, report.status, str(report.fetched_count), str(report.passed_count), str(report.rejected_count), str(active))
+        if report.error:
+            console.print(f"{report.label}: {report.error}", markup=False)
     console.print(sources)
 
     source_reasons = Table(title="Rejections by Source and Reason")
-    for column in ("Provider", "Company", "Reason", "Count"):
+    for column in ("Source", "Reason", "Count"):
         source_reasons.add_column(column)
     for report in diagnostics.source_reports:
         for reason, count in report.reason_counts.most_common():
-            source_reasons.add_row(report.source.provider, report.source.company, reason, str(count))
+            source_reasons.add_row(report.label, reason, str(count))
     console.print(source_reasons)
 
     families = Counter()
@@ -337,41 +346,14 @@ def _print_discovery_diagnostics(diagnostics, *, active_counts: Counter[tuple[st
     console.print(family_table)
 
 
-def _active_source_counts() -> Counter[tuple[str, str]]:
-    counts: Counter[tuple[str, str]] = Counter()
-    for row in db_list_jobs():
-        if _display_status(dict(row)) not in {"rejected", "skipped", "archived", "ignored"}:
-            counts[(str(row["provider"] or "manual"), str(row["company"] or "unknown company"))] += 1
-    return counts
+def _active_source_counts() -> Counter[str]:
+    report, _sources, _packs = _source_metrics_report()
+    return report.active_sources
 
 
 def _print_corpus_concentration() -> None:
-    rows = db_list_jobs()
-    active_counts = _active_source_counts()
-    total = sum(active_counts.values())
-    companies = Table(title="Active Corpus by Source and Company")
-    for column in ("Provider", "Company", "Active", "Corpus %", "Concentrated"):
-        companies.add_column(column)
-    for (provider, company), count in sorted(active_counts.items(), key=lambda item: (-item[1], item[0])):
-        companies.add_row(provider, company, str(count), f"{(count / total) if total else 0:.1%}", "yes" if total and count / total >= 0.5 else "")
-    console.print(companies)
-
-    providers = Counter()
-    roles = Counter()
-    for row in rows:
-        provider = str(row["provider"] or "manual")
-        company = str(row["company"] or "unknown company")
-        if (provider, company) not in active_counts:
-            continue
-        providers[provider] += 1
-        roles[str(row["primary_role_family"] or row["role_type"] or "unknown")] += 1
-    for title, counts in (("Active Corpus by Provider", providers), ("Active Corpus by Canonical Role Family", roles)):
-        table = Table(title=title)
-        table.add_column("Group")
-        table.add_column("Active")
-        for name, count in counts.most_common():
-            table.add_row(name, str(count))
-        console.print(table)
+    report, _sources, _packs = _source_metrics_report()
+    print_concentration(console, report)
 
 
 def _print_analytics_report(report) -> None:
@@ -502,28 +484,24 @@ def _batch_review_job(job_row) -> None:
             note = input("Note (optional): ").strip() or None
 
             if choice == "s":
-                set_review_status(job_id, "saved")
-                insert_feedback(job_id, "saved", reason, note)
-                sync_weights()
+                services.save_job(job_id, reason, note, sync_learning=True)
                 console.print(f"Saved job {job_id}.")
                 return
             if choice == "p":
-                set_review_status(job_id, "saved")
-                insert_feedback(job_id, "packaged", reason, note)
-                sync_weights()
+                services.save_job(job_id, reason, note, sync_learning=True)
                 try:
-                    paths = build_application_package(job_id)
+                    services.prepare_application(job_id, reason, note, sync_learning=True)
+                    paths = application_package_paths(services.require_job(job_id))
                 except ValueError as exc:
                     raise typer.BadParameter(str(exc)) from exc
                 console.print(f"Saved job {job_id}.")
                 console.print(f"Generated application package: {paths.directory}")
                 return
             if choice == "a":
-                set_review_status(job_id, "saved")
-                insert_feedback(job_id, "packaged", reason, note)
-                sync_weights()
+                services.save_job(job_id, reason, note, sync_learning=True)
                 try:
-                    paths = build_application_package(job_id)
+                    services.prepare_application(job_id, reason, note, sync_learning=True)
+                    paths = application_package_paths(services.require_job(job_id))
                 except ValueError as exc:
                     raise typer.BadParameter(str(exc)) from exc
                 console.print(f"Saved job {job_id}.")
@@ -589,24 +567,37 @@ def ingest(diagnostics: bool = typer.Option(False, "--diagnostics", help="Print 
     else:
         console.print("Using configured job sources from data/job_sources.yaml.")
     console.print(f"Using active search profile {active_profile.name}.")
-    report = collect_discovery_diagnostics(sources, active_profile)
+    run_id = start_ingest_run(active_profile)
     inserted = 0
     updated = 0
-    for source_report in report.source_reports:
-        if source_report.status == "failed":
-            source = source_report.source
-            console.print(f"[red]Failed to ingest {source.provider}:{source.company or source.company_slug or source.board_token or source.account}[/red] {source_report.error}")
-            continue
-        for job in source_report.accepted_jobs:
-            payload = job.model_dump()
-            payload["fit_score"], _notes = score_job_fit_v1(payload, profile=active_profile)
-            payload["status"] = "new"
-            existing = get_job_by_provider_external_id(job.provider, job.external_id)
-            insert_job(payload, review_status="new")
-            if existing is None:
-                inserted += 1
-            else:
-                updated += 1
+    try:
+        report = collect_discovery_diagnostics(sources, active_profile)
+        for source_report in report.source_reports:
+            record_source_run(run_id, source_report)
+            if source_report.status == "failed":
+                console.print(f"[red]Failed to ingest {source_report.label}[/red] {source_report.error}")
+                continue
+            source_inserted = source_updated = 0
+            try:
+                for job in source_report.accepted_jobs:
+                    payload = job.model_dump()
+                    payload["source_id"] = source_report.label
+                    payload["fit_score"], _notes = score_job_fit_v1(payload, profile=active_profile)
+                    payload["status"] = "new"
+                    existing = get_job_by_provider_external_id(job.provider, job.external_id)
+                    insert_job(payload, review_status="new")
+                    if existing is None:
+                        source_inserted += 1
+                        inserted += 1
+                    else:
+                        source_updated += 1
+                        updated += 1
+            finally:
+                record_source_run(run_id, source_report, inserted=source_inserted, updated=source_updated)
+    except BaseException as exc:
+        finish_ingest_run(run_id, error=f"{type(exc).__name__}: {exc}")
+        raise
+    finish_ingest_run(run_id)
     console.print(f"Fetched {report.fetched_count} job(s). Filtered out {report.rejected_count} job(s). Inserted {inserted} new job(s). Updated {updated} existing job(s).")
     if diagnostics or false_negative_audit:
         _print_discovery_diagnostics(report, active_counts=_active_source_counts())
@@ -689,7 +680,7 @@ def analyze(job_id: int) -> None:
         seniority = persisted["seniority"] or seniority
         role_type = persisted["primary_role_family"] or role_type
     active_profile = _load_active_profile()
-    display_fit_score, display_fit_notes = score_job_fit_v1(job, profile=active_profile)
+    display_fit_score, display_fit_notes = services.job_score(dict(row), profile=active_profile)
     fit_score, fit_notes = score_fit(job, role_type, seniority, pack, candidate, matched_keywords, profile=active_profile)
     quality_score, quality_notes = score_quality(job, role_type, seniority)
     recommendation, skip_reason = make_recommendation(fit_score, risk_score, quality_score, role_type, seniority, red_flags)
@@ -749,7 +740,7 @@ def score_breakdown(job_id: int, goal: str | None = typer.Option(None, "--goal")
         job["primary_role_family"] = classification["primary_role_family"]
         job["secondary_role_families"] = load_json(classification["secondary_role_families_json"])
         job["canonical_seniority"] = classification["seniority"]
-    breakdown = score_job_fit_breakdown(job, learned_weights=load_learned_weights(), profile=profile)
+    breakdown = score_job_fit_breakdown(services.scoring_job(job), learned_weights=load_learned_weights(), profile=profile)
     console.print(f"Goal: {profile.active_goal or 'none'} | Primary: {breakdown.primary_role_family or 'unclassified'} | Secondary: {', '.join(breakdown.secondary_role_families) or 'none'}")
     table = Table(title=f"Score breakdown for job {job_id}")
     table.add_column("Category"); table.add_column("Contribution"); table.add_column("Points", justify="right")
@@ -812,9 +803,8 @@ def packet(job_id: int) -> None:
 def package(job_id: int, reason: str | None = typer.Option(None), note: str | None = typer.Option(None)) -> None:
     _ensure_workspace()
     try:
-        paths = build_application_package(job_id)
-        insert_feedback(job_id, "packaged", reason, note)
-        sync_weights()
+        services.prepare_application(job_id, reason, note, sync_learning=True)
+        paths = application_package_paths(services.require_job(job_id))
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     console.print(f"Generated application package: {paths.directory}")
@@ -845,9 +835,7 @@ def review() -> None:
 
             if choice == "y":
                 job_id = int(row["id"])
-                set_review_status(job_id, "saved")
-                insert_feedback(job_id, "saved", reason, note)
-                sync_weights()
+                services.save_job(job_id, reason, note, sync_learning=True)
                 console.print(f"Saved job {job_id}.")
                 index += 1
                 continue
@@ -895,9 +883,7 @@ def save(job_id: int, reason: str | None = typer.Option(None), note: str | None 
     row = get_job(job_id)
     if not row:
         raise typer.BadParameter(f"Job {job_id} not found.")
-    set_review_status(job_id, "saved")
-    insert_feedback(job_id, "saved", reason, note)
-    sync_weights()
+    services.save_job(job_id, reason, note, sync_learning=True)
     console.print(f"Saved job {job_id}.")
 
 
@@ -1359,6 +1345,51 @@ def sources_audit() -> None:
     report = collect_discovery_diagnostics(sources, _load_active_profile(), include_disabled=True)
     _print_discovery_diagnostics(report, active_counts=_active_source_counts())
     _print_corpus_concentration()
+
+
+@sources_app.command("yield")
+def sources_yield(history: bool = typer.Option(False, "--history", help="Show completed per-run source measurements.")) -> None:
+    """Compare discovery yield with current corpus state without fetching jobs."""
+    report, sources, packs = _source_metrics_report()
+    runs = completed_runs(report)
+    stats = run_stats(report, runs[0]["id"]) if runs else {}
+    if not runs:
+        console.print("No completed ingest measurements. Run `jobpipe ingest` to start measuring sources.")
+    elif history:
+        print_history(console, report)
+    else:
+        print_run(console, report, runs[0], sources)
+    print_corpus(console, report, sources, stats)
+    print_concentration(console, report)
+    print_packs(console, packs, stats)
+
+
+@sources_app.command("trial")
+def sources_trial(source_id: str = typer.Argument(..., help="Configured company/name/token or provider:token; catalog sources are also accepted.")) -> None:
+    """Fetch and filter one source with production rules and zero local writes."""
+    sources, packs = _source_catalog()
+    selected = [source for source in sources if _source_matches_identifier(source, source_id)]
+    if not selected:
+        # Choose the first catalog definition in sorted pack order, and disclose it.
+        catalog = {}
+        for pack, members in sorted(packs.items()):
+            for source in members:
+                catalog.setdefault(source_identity_label(source), (source, pack))
+        selected = [source for source, _pack in catalog.values() if _source_matches_identifier(source, source_id)]
+        if len(selected) == 1:
+            console.print(f"Catalog definition: {catalog[source_identity_label(selected[0])][1]} (pack rules; configuration unchanged)")
+    by_id = {source_identity_label(source): source for source in selected}
+    if not by_id:
+        raise typer.BadParameter(f"Source {source_id!r} not found in configured sources or source packs.")
+    if len(by_id) != 1:
+        raise typer.BadParameter(f"Ambiguous source {source_id!r}; use one of: {', '.join(sorted(by_id))}")
+    source = next(iter(by_id.values()))
+    profile = _load_active_profile()
+    # Override enabled only in memory so explicitly selected disabled boards run.
+    report = collect_discovery_diagnostics([source.model_copy(update={"enabled": True})], profile).source_reports[0]
+    print_trial(console, report, profile=profile.name, goal=profile.active_goal)
+    if report.status == "failed":
+        raise typer.Exit(code=1)
 
 
 @sources_app.command("test")

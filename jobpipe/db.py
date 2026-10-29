@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     provider TEXT NOT NULL DEFAULT 'manual',
     external_id TEXT NOT NULL DEFAULT '',
+    source_id TEXT,
     source_url TEXT,
     title TEXT,
     company TEXT,
@@ -101,13 +103,46 @@ CREATE TABLE IF NOT EXISTS feedback (
     created_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+
+CREATE TABLE IF NOT EXISTS ingest_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    profile TEXT NOT NULL,
+    goal TEXT,
+    profile_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'aborted')),
+    error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS source_run_stats (
+    run_id INTEGER NOT NULL REFERENCES ingest_runs(id),
+    source_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    company TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    fetch_status TEXT NOT NULL,
+    error TEXT,
+    fetched INTEGER NOT NULL CHECK(fetched >= 0),
+    passed INTEGER NOT NULL CHECK(passed >= 0),
+    rejected INTEGER NOT NULL CHECK(rejected >= 0),
+    inserted INTEGER NOT NULL CHECK(inserted >= 0),
+    updated INTEGER NOT NULL CHECK(updated >= 0),
+    PRIMARY KEY (run_id, source_id),
+    CHECK(fetched = passed + rejected)
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_completed ON ingest_runs(status, completed_at, id);
+CREATE INDEX IF NOT EXISTS idx_source_run_stats_source ON source_run_stats(source_id, run_id);
 """
 
 
-def connect(path: Path | None = None) -> sqlite3.Connection:
+def connect(path: Path | None = None, *, mode: str = "rwc") -> sqlite3.Connection:
     actual = path or db_path()
-    ensure_dir(actual.parent)
-    conn = sqlite3.connect(actual)
+    if mode not in {"ro", "rw", "rwc"}:
+        raise ValueError("Unsupported SQLite access mode")
+    if mode == "rwc":
+        ensure_dir(actual.parent)
+    conn = sqlite3.connect(actual.resolve().as_uri() + f"?mode={mode}", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -119,6 +154,7 @@ def init_database(path: Path | None = None) -> None:
         _migrate_job_analysis(conn)
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_provider_external_id ON jobs(provider, external_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_review_queue ON jobs(status, fit_score DESC, discovered_at ASC, id ASC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source_id)")
 
 
 def _migrate_jobs(conn: sqlite3.Connection) -> None:
@@ -126,6 +162,7 @@ def _migrate_jobs(conn: sqlite3.Connection) -> None:
     additions = {
         "provider": "TEXT",
         "external_id": "TEXT",
+        "source_id": "TEXT",
         "remote": "INTEGER NOT NULL DEFAULT 0",
         "apply_url": "TEXT",
         "posted_at": "TEXT",
@@ -198,6 +235,7 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
     payload = {
         "provider": provider,
         "external_id": external_id,
+        "source_id": data.get("source_id"),
         "source_url": data.get("source_url", ""),
         "title": data.get("title", ""),
         "company": data.get("company", ""),
@@ -220,15 +258,16 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
         cur = conn.execute(
             """
             INSERT INTO jobs (
-                provider, external_id, source_url, title, company, location, remote, apply_url,
+                provider, external_id, source_id, source_url, title, company, location, remote, apply_url,
                 posted_at, discovered_at, fit_score, status, remote_type, employment_type,
                 salary_text, description, raw_text, created_at, updated_at
             ) VALUES (
-                :provider, :external_id, :source_url, :title, :company, :location, :remote, :apply_url,
+                :provider, :external_id, :source_id, :source_url, :title, :company, :location, :remote, :apply_url,
                 :posted_at, :discovered_at, :fit_score, :status, :remote_type, :employment_type,
                 :salary_text, :description, :raw_text, :created_at, :updated_at
             )
             ON CONFLICT(provider, external_id) DO UPDATE SET
+                source_id = COALESCE(jobs.source_id, excluded.source_id),
                 source_url = CASE WHEN excluded.source_url = '' THEN jobs.source_url ELSE excluded.source_url END,
                 title = CASE WHEN excluded.title = '' THEN jobs.title ELSE excluded.title END,
                 company = CASE WHEN excluded.company = '' THEN jobs.company ELSE excluded.company END,
@@ -285,12 +324,12 @@ def set_review_status(job_id: int, status: str) -> None:
 
 
 def fetch_one(query: str, params: tuple[Any, ...] = ()) -> sqlite3.Row | None:
-    with connect() as conn:
+    with closing(connect(mode="ro")) as conn:
         return conn.execute(query, params).fetchone()
 
 
 def fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[sqlite3.Row]:
-    with connect() as conn:
+    with closing(connect(mode="ro")) as conn:
         return conn.execute(query, params).fetchall()
 
 
@@ -423,7 +462,7 @@ def list_jobs() -> list[sqlite3.Row]:
     return fetch_all(
         """
         SELECT
-            jobs.id, jobs.provider, jobs.external_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
+            jobs.id, jobs.provider, jobs.external_id, jobs.source_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
             jobs.location, jobs.remote, jobs.posted_at, jobs.discovered_at, jobs.fit_score, jobs.description, jobs.raw_text,
             jobs.status AS review_status,
             job_classifications.primary_role_family AS role_type,

@@ -99,7 +99,7 @@ def source_identity(source: JobSource) -> tuple[str, str, str, str]:
 
 def source_identity_label(source: JobSource) -> str:
     provider, company_slug, token, company = source_identity(source)
-    identifier = token or company_slug or company or provider
+    identifier = (token or company_slug or company or provider).strip().lower()
     return f"{provider}:{identifier}"
 
 

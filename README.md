@@ -161,3 +161,13 @@ Useful focused checks:
 - Harden status and feedback validation across the CLI and dashboard.
 - Grow the knowledge graph and role packs for additional job families.
 - Keep adding regression tests around ingest, packaging, and dashboard filters as the workspace evolves.
+
+## Agent interface (v0.2.0)
+
+Job-Pipe exposes nine typed local MCP tools for job search, fit explanations,
+application history, source yield, goals, follow-ups, saving, and package
+preparation. The stdio server is read-only by default; local writes require
+`--enable-local-writes`. No application is submitted externally.
+
+See [the agent interface guide](docs/AGENT_INTERFACE.md) for installation,
+Codex/Antigravity setup, permissions, schemas, and protocol validation.

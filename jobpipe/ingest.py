@@ -107,6 +107,8 @@ class SourceDiscoveryReport:
     reason_counts: Counter[str] = field(default_factory=Counter)
     role_family_counts: Counter[str] = field(default_factory=Counter)
     rejected_role_family_counts: Counter[str] = field(default_factory=Counter)
+    passed_role_family_counts: Counter[str] = field(default_factory=Counter)
+    passed_seniority_counts: Counter[str] = field(default_factory=Counter)
     rejected_jobs: list[tuple[DiscoveredJob, FilterDecision]] = field(default_factory=list)
     accepted_jobs: list[DiscoveredJob] = field(default_factory=list)
     error: str | None = None
@@ -248,6 +250,8 @@ def collect_discovery_diagnostics(
             report.role_family_counts[decision.role_family or "unknown"] += 1
             if decision.accepted:
                 report.passed_count += 1
+                report.passed_role_family_counts[decision.role_family or "unknown"] += 1
+                report.passed_seniority_counts[decision.seniority or "unknown"] += 1
                 report.accepted_jobs.append(job)
             else:
                 report.rejected_count += 1

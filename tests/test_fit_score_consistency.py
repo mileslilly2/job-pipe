@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from jobpipe.catalog import load_search_profile
 from jobpipe.cli import app
-from jobpipe.db import get_analysis, get_job, insert_job, list_review_jobs
+from jobpipe.db import get_analysis, get_classification, get_job, insert_job, list_review_jobs
+from jobpipe.learn import load_learned_weights
 from jobpipe.score import score_job_fit_v1
+from jobpipe.utils import load_json
 
 
 def _insert_stale_job(*, external_id: str, company: str, title: str, description: str, stored_fit_score: int, remote: bool) -> int:
@@ -47,8 +49,16 @@ def test_fit_score_is_consistent_across_queue_list_details_and_analyze(initializ
     assert low_job is not None
 
     profile = load_search_profile()
-    expected_high_score, expected_high_notes = score_job_fit_v1(dict(high_job), profile=profile)
-    expected_low_score, _ = score_job_fit_v1(dict(low_job), profile=profile)
+    def canonical_score(row):
+        classification = get_classification(row["id"])
+        return score_job_fit_v1({**dict(row),
+            "primary_role_family": classification["primary_role_family"],
+            "secondary_role_families": load_json(classification["secondary_role_families_json"]),
+            "canonical_seniority": classification["seniority"],
+        }, learned_weights=load_learned_weights(), profile=profile)
+
+    expected_high_score, expected_high_notes = canonical_score(high_job)
+    expected_low_score, _ = canonical_score(low_job)
     assert expected_high_score > expected_low_score
     assert high_job["fit_score"] == 12
     assert low_job["fit_score"] == 88

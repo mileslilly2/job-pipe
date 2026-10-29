@@ -8,6 +8,13 @@ from typer.testing import CliRunner
 from jobpipe.cli import app
 
 
+@pytest.fixture(autouse=True)
+def isolated_learning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # learn.py captures its default path at import time; never let a test sync
+    # weights into the real workspace after a fixture changes cwd/database.
+    monkeypatch.setattr("jobpipe.learn.WEIGHTS_FILE", tmp_path / "data" / "learned_weights.yaml")
+
+
 @pytest.fixture()
 def runner() -> CliRunner:
     return CliRunner()

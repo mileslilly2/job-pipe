@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +114,24 @@ def load_base_profile(path: Path | None = None) -> BaseProfile:
     return _parse_base_profile(text)
 
 
+def existing_package(job: dict[str, Any]) -> ApplicationPackagePaths | None:
+    """Return a complete, regular bundle; refuse ambiguous or unsafe destinations."""
+    paths = application_package_paths(job)
+    root = applications_dir()
+    if root.is_symlink() or paths.directory.is_symlink():
+        raise ValueError("Application package destination must not be a symlink.")
+    if paths.directory.resolve().parent != root.resolve():
+        raise ValueError("Application package destination escapes applications directory.")
+    artifacts = (paths.job_md, paths.fit_md, paths.resume_tailored_md, paths.cover_note_md, paths.apply_md)
+    if any(path.is_symlink() for path in artifacts):
+        raise ValueError("Application package artifacts must not be symlinks.")
+    if not paths.directory.exists():
+        return None
+    if not paths.directory.is_dir() or not all(path.is_file() for path in artifacts):
+        raise ValueError("Incomplete application package; inspect and move it aside before preparing again. Existing files were preserved.")
+    return paths
+
+
 def build_application_package(job_id: int, profile_file: Path | None = None) -> ApplicationPackagePaths:
     job_row = get_job(job_id)
     if not job_row:
@@ -120,20 +140,34 @@ def build_application_package(job_id: int, profile_file: Path | None = None) -> 
         raise ValueError("Run save before package.")
 
     job = dict(job_row)
+    existing = existing_package(job)
+    if existing is not None:
+        return existing
     base_profile = load_base_profile(profile_file)
     fit_score, fact_report = _fit_context(job)
     fit_summary = build_fit_summary(job, base_profile)
     tailoring = build_resume_tailoring(job, base_profile)
 
-    directory = package_directory_for_job(job)
-    ensure_dir(directory)
     paths = application_package_paths(job)
-
-    paths.job_md.write_text(_build_job_md(job), encoding="utf-8")
-    paths.fit_md.write_text(_build_fit_md(fit_score, fit_summary), encoding="utf-8")
-    paths.resume_tailored_md.write_text(_build_resume_tailored_md(tailoring), encoding="utf-8")
-    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, fact_report, tailoring), encoding="utf-8")
-    paths.apply_md.write_text(_build_apply_md(job, job_id), encoding="utf-8")
+    content = {
+        paths.job_md.name: _build_job_md(job),
+        paths.fit_md.name: _build_fit_md(fit_score, fit_summary),
+        paths.resume_tailored_md.name: _build_resume_tailored_md(tailoring),
+        paths.cover_note_md.name: _build_cover_note_md(job, fit_score, fact_report, tailoring),
+        paths.apply_md.name: _build_apply_md(job, job_id),
+    }
+    ensure_dir(applications_dir())
+    staging = Path(tempfile.mkdtemp(prefix=".jobpipe-package-", dir=applications_dir()))
+    try:
+        for name, text in content.items():
+            (staging / name).write_text(text, encoding="utf-8")
+        # A competing writer must never cause replacement of user materials.
+        if paths.directory.exists() or paths.directory.is_symlink():
+            raise ValueError("Application package appeared during preparation; retry after inspection.")
+        staging.rename(paths.directory)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
     return paths
 
 
@@ -181,8 +215,9 @@ def _parse_base_profile(text: str) -> BaseProfile:
 
 
 def _fit_context(job: dict[str, Any]) -> tuple[int, Any]:
+    from .services import job_score
     profile = load_search_profile()
-    computed_score, _notes = score_job_fit_v1(job, profile=profile)
+    computed_score, _notes = job_score(job, profile=profile)
     fact_report = build_fact_report(job, profile)
     return computed_score, fact_report
 
