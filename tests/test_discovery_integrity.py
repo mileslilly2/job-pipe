@@ -194,8 +194,8 @@ def test_discovery_to_five_packages_via_real_stdio(protocol_workspace):
     transcript = []
     async def run():
         async with Client(parameters(workspace, bootstrap,
-                ['--enable-ingest', '--enable-source-trials', '--enable-local-writes']), read_timeout_seconds=20) as client:
-            assert len((await client.list_tools()).tools) == 14
+                ['--enable-ingest', '--enable-source-trials', '--enable-local-writes', '--enable-applicant-profile-read']), read_timeout_seconds=20) as client:
+            assert len((await client.list_tools()).tools) == 20
             transcript.append(await call(client, 'get_active_goal'))
             transcript.append(await call(client, 'get_discovery_status'))
             before = snapshot(workspace)

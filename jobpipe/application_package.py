@@ -64,6 +64,8 @@ class BaseProfile:
     skills: list[str]
     projects: list[ProfileProject]
     education: list[str]
+    employment: list[dict[str, Any]] = field(default_factory=list)
+    verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,13 @@ def application_package_paths(job: dict[str, Any]) -> ApplicationPackagePaths:
 
 
 def load_base_profile(path: Path | None = None) -> BaseProfile:
+    from .applicant_profile import candidate_projection, state
+    if path is None and state()["active"]:
+        candidate = candidate_projection()
+        return BaseProfile(summary=candidate.profile.get("summary", ""), skills=[s for values in candidate.skills.values() for s in values],
+                           projects=[ProfileProject(p.name, p.bullets) for p in candidate.projects],
+                           education=[" | ".join(filter(None, [e.school, e.degree, e.dates])) for e in candidate.education],
+                           employment=[e.model_dump() for e in candidate.experience], verified=True)
     actual = path or profile_path()
     text = actual.read_text(encoding="utf-8")
     return _parse_base_profile(text)
@@ -132,7 +141,7 @@ def existing_package(job: dict[str, Any]) -> ApplicationPackagePaths | None:
     return paths
 
 
-def build_application_package(job_id: int, profile_file: Path | None = None) -> ApplicationPackagePaths:
+def build_application_package(job_id: int, profile_file: Path | None = None, *, preparation_mode: str | None = None) -> ApplicationPackagePaths:
     job_row = get_job(job_id)
     if not job_row:
         raise ValueError(f"Job {job_id} not found.")
@@ -143,6 +152,10 @@ def build_application_package(job_id: int, profile_file: Path | None = None) -> 
     existing = existing_package(job)
     if existing is not None:
         return existing
+    if preparation_mode is None:
+        from .applicant_profile import state
+        from .services import get_job_eligibility
+        preparation_mode = "draft_preparation" if state()["active"] and get_job_eligibility(job_id)["eligibility"]["status"] != "eligible" else "ready_for_submission"
     base_profile = load_base_profile(profile_file)
     fit_score, fact_report = _fit_context(job)
     fit_summary = build_fit_summary(job, base_profile)
@@ -156,6 +169,18 @@ def build_application_package(job_id: int, profile_file: Path | None = None) -> 
         paths.cover_note_md.name: _build_cover_note_md(job, fit_score, fact_report, tailoring),
         paths.apply_md.name: _build_apply_md(job, job_id),
     }
+    if base_profile.verified:
+        employment_lines = []
+        for record in base_profile.employment:
+            employment_lines.extend([f"### {record['title']} — {record['organization']}", record["dates"], *[f"- {b}" for b in record["bullets"]], ""])
+        if employment_lines:
+            content[paths.resume_tailored_md.name] += "\n## Professional Employment\n\n" + "\n".join(employment_lines)
+    if preparation_mode == "draft_preparation":
+        from .services import get_job_eligibility
+        assessment = get_job_eligibility(job_id)["eligibility"]
+        banner = "> DRAFT — BLOCKED FROM SUBMISSION READINESS. Eligibility is not established.\n\n"
+        content = {name: banner + value for name, value in content.items()}
+        content[paths.apply_md.name] += "\n## Unresolved Information\n\n" + "\n".join(f"- {gap}" for gap in [*assessment["missing_applicant_information"], *assessment["missing_employer_information"], *assessment["concerns"]]) + "\n"
     ensure_dir(applications_dir())
     staging = Path(tempfile.mkdtemp(prefix=".jobpipe-package-", dir=applications_dir()))
     try:
@@ -264,7 +289,7 @@ def _build_resume_tailored_md(tailoring) -> str:
         "",
         "## Summary",
         "",
-        tailoring.summary or "Project-focused technical problem solver.",
+        tailoring.summary or "[Summary requires applicant confirmation.]",
         "",
         "## Relevant Skills",
         "",
@@ -285,6 +310,14 @@ def _build_resume_tailored_md(tailoring) -> str:
 def _build_cover_note_md(job: dict[str, Any], fit_score: int, fact_report, tailoring) -> str:
     company = job.get("company") or "your team"
     title = job.get("title") or "role"
+    from .applicant_profile import state
+    if state()["active"]:
+        lines = [f"I am interested in the {title} role at {company}."]
+        if tailoring.selected_skills:
+            lines.append("My confirmed skills include " + ", ".join(tailoring.selected_skills[:4]) + ".")
+        for project in tailoring.selected_projects[:1]:
+            lines.append(f"My independent project work includes {project['title']}.")
+        return "\n\n".join(lines) + "\n"
     focus = ", ".join(tailoring.selected_skills[:4]) if tailoring.selected_skills else "practical problem solving"
     project_focus = tailoring.selected_projects[0]["title"] if tailoring.selected_projects else "repeatable workflows"
     lines = [

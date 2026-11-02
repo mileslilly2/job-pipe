@@ -86,7 +86,7 @@ gh._fetch_json = fetch
 @asynccontextmanager
 async def stdio(root, *flags):
     params = StdioServerParameters(command=sys.executable,
-        args=["-m", "jobpipe.mcp_server", "--workspace", str(root), *flags], cwd="/tmp",
+        args=["-m", "jobpipe.mcp_server", "--workspace", str(root), "--enable-applicant-profile-read", *flags], cwd="/tmp",
         env={"PYTHONPATH": os.environ["PYTHONPATH"], "PYTHONDONTWRITEBYTECODE": "1"})
     async with Client(params, read_timeout_seconds=40) as client:
         yield client
@@ -119,7 +119,7 @@ def test_stdio_discovery_to_five_prepared_applications(discovery_workspace):
     async def run():
         async with stdio(root, "--enable-ingest", "--enable-source-trials", "--enable-local-writes") as client:
             tools = await client.list_tools()
-            assert len(tools.tools) == 14
+            assert len(tools.tools) == 20
             annotations = {t.name: t.annotations for t in tools.tools}
             assert annotations["trial_source"].open_world_hint
             assert not annotations["ingest_sources"].idempotent_hint
@@ -237,7 +237,7 @@ def test_trial_timeout_is_nonpersistent(discovery_workspace, monkeypatch):
     monkeypatch.setattr(discovery, "TRIAL_TIMEOUT", 0.05)
     before = snapshot(discovery_workspace)
     async def run():
-        async with Client(create_server(enable_source_trials=True)) as client:
+        async with Client(create_server(enable_source_trials=True, enable_applicant_profile_read=True)) as client:
             await call(client, "trial_source", {"source_id": "greenhouse:fixture"}, error="operation_timeout")
     asyncio.run(run())
     assert snapshot(discovery_workspace) == before
@@ -255,7 +255,7 @@ def test_trial_timeout_is_nonpersistent(discovery_workspace, monkeypatch):
 ])
 def test_discovery_argument_boundaries(discovery_workspace, tool, args, code):
     async def run():
-        async with Client(create_server(enable_source_trials=True, enable_ingest=True)) as client:
+        async with Client(create_server(enable_source_trials=True, enable_ingest=True, enable_applicant_profile_read=True)) as client:
             await call(client, tool, args, error=code)
     asyncio.run(run())
 

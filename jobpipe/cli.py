@@ -55,6 +55,8 @@ from .source_display import print_concentration, print_corpus, print_history, pr
 from .utils import data_dir, ensure_dir, load_json, load_yaml, output_dir, package_dir, root_dir, slugify
 
 app = typer.Typer(help="Application cockpit for repetitive job applications.")
+from .applicant_cli import app as applicant_app
+app.add_typer(applicant_app, name="applicant")
 
 @app.command("classification-audit")
 def classification_audit(sample: Path = typer.Option(Path("diagnostics/false_negative_review.md"), "--sample"), gold: Path = typer.Option(Path("tests/fixtures/classification_gold.yaml"), "--gold"), output: Path = typer.Option(Path("diagnostics/classification_audit.json"), "--output")) -> None:
@@ -75,6 +77,9 @@ def _env() -> Environment:
 
 
 def _load_candidate() -> CandidateProfile:
+    from .applicant_profile import candidate_projection, state
+    if state()["active"]:
+        return candidate_projection()
     return CandidateProfile.model_validate(load_yaml(data_dir() / "profiles" / "candidate.yaml"))
 
 
@@ -202,6 +207,16 @@ def _source_metrics_report():
 
 def _render_template(template_name: str, context: dict) -> str:
     return _env().get_template(template_name).render(**context)
+
+
+def _write_packet(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    if path.is_symlink() or path.parent.is_symlink():
+        raise typer.BadParameter("Packet destination must not be a symlink.")
+    try:
+        with path.open("x", encoding=encoding) as output:
+            output.write(text)
+    except FileExistsError as exc:
+        raise typer.BadParameter("Existing packet preserved. Inspect and explicitly move it aside before generating a replacement.") from exc
 
 
 def _score_notes(job_row, profile=None) -> tuple[int, list[str]]:
@@ -765,7 +780,7 @@ def packet(job_id: int) -> None:
     packet_context = build_packet_context(analysis)
     slug = f"{job_id}-{slugify(job.title or analysis.role_type)}"
     packet_path = output_dir() / "packets" / f"{slug}-packet.md"
-    packet_path.write_text(
+    _write_packet(packet_path,
         _render_template(
             "packet.md.j2",
             {"job": job, "analysis": analysis, "tailor": tailored, "packet": packet_context},
@@ -904,7 +919,7 @@ def tailor(job_id: int) -> None:
     packet_context = build_packet_context(analysis)
     slug = f"{job_id}-{slugify(job.title or analysis.role_type)}"
     packet_path = output_dir() / "packets" / f"{slug}-packet.md"
-    packet_path.write_text(
+    _write_packet(packet_path,
         _render_template(
             "packet.md.j2",
             {"job": job, "analysis": analysis, "tailor": tailored, "packet": packet_context},

@@ -4,7 +4,10 @@ from jobpipe.cli import _apply_flow_session, _batch_review_job
 from unittest.mock import patch, MagicMock
 
 @pytest.fixture
-def test_db(tmp_path):
+def test_db(tmp_path, monkeypatch):
+    # Isolate profile reads and generated files as well as SQLite. A renderer
+    # regression must never reach the real workspace through cwd-bound paths.
+    monkeypatch.chdir(tmp_path)
     db_file = tmp_path / "test_jobpipe.db"
     import jobpipe.utils
     import jobpipe.db

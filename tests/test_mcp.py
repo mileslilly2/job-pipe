@@ -34,9 +34,10 @@ from jobpipe.source_metrics import build_source_metrics, finish_ingest_run, reco
 from jobpipe.tracker import update_status
 from jobpipe.utils import package_dir
 
-TOOLS = {"search_jobs", "get_job", "get_fit_breakdown", "list_applications", "get_source_yield",
+JOB_TOOLS = {"search_jobs", "get_job", "get_fit_breakdown", "list_applications", "get_source_yield",
          "get_active_goal", "get_followups", "save_job", "prepare_application", "ingest_sources",
          "trial_source", "get_discovery_status", "get_job_eligibility", "search_eligible_jobs"}
+TOOLS = JOB_TOOLS | {"get_applicant_profile", "get_applicant_readiness", "get_application_readiness", "get_readiness_questions", "propose_applicant_facts", "get_application_answer"}
 
 
 @pytest.fixture()
@@ -77,7 +78,7 @@ def agent_workspace(workspace, monkeypatch):
 
 @asynccontextmanager
 async def stdio_client(workspace: Path, writes: bool = False):
-    args = ["-m", "jobpipe.mcp_server", "--workspace", str(workspace)]
+    args = ["-m", "jobpipe.mcp_server", "--workspace", str(workspace), "--enable-applicant-profile-read", "--enable-applicant-fact-proposals"]
     if writes:
         args.append("--enable-local-writes")
     parameters = StdioServerParameters(command=sys.executable, args=args, cwd="/tmp",
@@ -116,7 +117,7 @@ def test_discovery_and_typed_schemas(agent_workspace):
                 assert tool.description
                 jsonschema.Draft202012Validator.check_schema(tool.input_schema)
                 jsonschema.Draft202012Validator.check_schema(tool.output_schema)
-                assert tool.annotations.read_only_hint == (tool.name not in {"save_job", "prepare_application", "ingest_sources"})
+                assert tool.annotations.read_only_hint == (tool.name not in {"save_job", "prepare_application", "ingest_sources", "propose_applicant_facts"})
                 args = {"job_id": 1} if tool.name in {"get_job", "get_fit_breakdown", "get_job_eligibility", "save_job", "prepare_application"} else {}
                 response = await client.call_tool(tool.name, args)
                 jsonschema.validate(response.structured_content, tool.output_schema)
@@ -140,7 +141,7 @@ def test_stdio_acceptance(agent_workspace, writes):
                 detail = await invoke(client, "get_job", {"job_id": item["job_id"]})
                 explanation = await invoke(client, "get_fit_breakdown", {"job_id": item["job_id"]})
                 assert item["fit_score"] == detail["fit_score"] == explanation["displayed_score"]
-            transcript["steps"].extend(["discover nine tools", "retrieve active goal", "search and inspect five jobs", "verify canonical fit explanations"])
+            transcript["steps"].extend(["discover twenty tools", "retrieve active goal", "search and inspect five jobs", "verify canonical fit explanations"])
             job_id = jobs["items"][0]["job_id"]
             if writes:
                 saved = await invoke(client, "save_job", {"job_id": job_id})
@@ -209,7 +210,7 @@ def test_stdio_acceptance(agent_workspace, writes):
 ])
 def test_errors(agent_workspace, tool, args, error):
     async def run():
-        async with Client(create_server(enable_local_writes=True)) as client:
+        async with Client(create_server(enable_local_writes=True, enable_applicant_profile_read=True)) as client:
             await invoke(client, tool, args, error=error)
     asyncio.run(run())
 
@@ -221,9 +222,9 @@ def test_uninitialized_database(workspace, condition):
     before = snapshot(workspace)
     async def run():
         async with stdio_client(workspace, writes=True) as client:
-            assert len((await client.list_tools()).tools) == 14
+            assert len((await client.list_tools()).tools) == 20
             assert (await invoke(client, "get_active_goal"))["configuration_origin"] == "built_in"
-            for tool in TOOLS - {"get_active_goal", "trial_source", "ingest_sources"}:
+            for tool in JOB_TOOLS - {"get_active_goal", "trial_source", "ingest_sources"}:
                 args = {"job_id": 1} if tool in {"get_job", "get_fit_breakdown", "save_job", "prepare_application", "get_job_eligibility"} else {}
                 await invoke(client, tool, args, error="missing_database" if condition == "missing" else "invalid_database")
     asyncio.run(run())
@@ -328,8 +329,8 @@ def test_inprocess_operations_are_offline(agent_workspace, monkeypatch):
         raise AssertionError("Network connection attempted")
     monkeypatch.setattr(socket.socket, "connect", forbidden)
     async def run():
-        async with Client(create_server(enable_local_writes=True)) as client:
-            assert len((await client.list_tools()).tools) == 14
+        async with Client(create_server(enable_local_writes=True, enable_applicant_profile_read=True)) as client:
+            assert len((await client.list_tools()).tools) == 20
             await invoke(client, "get_active_goal")
             await invoke(client, "search_jobs")
             await invoke(client, "get_source_yield")
@@ -397,7 +398,7 @@ def test_stdio_stdout_is_only_protocol(workspace):
         assert receive(1)["result"]["serverInfo"]["name"] == "jobpipe"
         send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         send({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        assert len(receive(2)["result"]["tools"]) == 14
+        assert len(receive(2)["result"]["tools"]) == 20
         process.stdin.close()
         assert process.wait(timeout=15) == 0
         assert process.stdout.read() == ""

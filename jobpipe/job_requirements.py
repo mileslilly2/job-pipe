@@ -73,7 +73,7 @@ def build_resume_tailoring(job: Any, profile: Any) -> ResumeTailoring:
     education = list(getattr(profile, 'education', []))
     emphasis = _build_emphasis(selected_skills, selected_projects, requirements)
     return ResumeTailoring(
-        summary=summary or 'Project-focused technical problem solver.',
+        summary=summary or ('' if getattr(profile, 'verified', False) else 'Project-focused technical problem solver.'),
         selected_skills=selected_skills,
         selected_projects=selected_projects,
         education=education,

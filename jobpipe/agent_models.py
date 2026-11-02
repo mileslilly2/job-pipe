@@ -46,6 +46,10 @@ class JobInput(Input):
     job_id: int = Field(gt=0, description="ID of an existing canonical Job-Pipe job.")
 
 
+class PreparationInput(JobInput):
+    mode: Literal["ready_for_submission", "draft_preparation"] = "ready_for_submission"
+
+
 class FitInput(JobInput):
     goal: str | None = Field(default=None, description="Existing goal name; overrides this request only.")
 
@@ -96,7 +100,7 @@ class SourceYieldInput(Pagination):
 
 
 class AgentError(BaseModel):
-    code: Literal["invalid_arguments", "unknown_job", "missing_database", "invalid_database", "configuration_error", "invalid_state_transition", "permission_denied", "application_preparation_failure", "internal_error", "eligibility_unresolved", "unknown_source", "unknown_run", "operation_in_progress", "operation_timeout"]
+    code: Literal["invalid_arguments", "unknown_job", "missing_database", "invalid_database", "configuration_error", "invalid_state_transition", "permission_denied", "application_preparation_failure", "internal_error", "eligibility_unresolved", "unknown_source", "unknown_run", "operation_in_progress", "operation_timeout", "profile_conflict", "profile_setup_required"]
     message: str
 
 
@@ -427,3 +431,9 @@ class PreparationResult(JobState):
     application_instruction_path: str
     validation_concerns: list[str]
     reused: bool
+    mode: Literal["ready_for_submission", "draft_preparation"]
+    readiness: "ApplicationReadiness"
+
+
+from .applicant_models import ApplicationReadiness
+PreparationResult.model_rebuild()

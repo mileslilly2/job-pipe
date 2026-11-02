@@ -1,6 +1,6 @@
-# Job-Pipe agent interface (v0.3.0)
+# Job-Pipe agent interface (v0.3.1)
 
-Job-Pipe provides fourteen local MCP tools over stdio. An agent discovers tools and
+Job-Pipe provides twenty local MCP tools over stdio. An agent discovers tools and
 exchanges structured data without reading Python source, issuing SQL, or parsing
 terminal tables. Job-Pipe supplies tools; it does not run an LLM.
 
@@ -17,20 +17,30 @@ are required. From an existing checkout, using fish-compatible commands:
 The default mode is **read-only**. To authorize the two bounded local writes:
 
 ```fish
-./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-local-writes
+./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-local-writes --enable-applicant-profile-read
 ```
 
-Discovery has separate permissions. None of these flags implies another:
+Discovery and applicant information have separate permissions. None of these flags implies another:
 
 ```fish
-./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-source-trials --enable-ingest --enable-local-writes
+./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-source-trials --enable-ingest --enable-local-writes --enable-applicant-profile-read --enable-applicant-fact-proposals
 ```
 
 `--enable-source-trials` permits network trials of configured/catalog sources.
 `--enable-ingest` permits ingestion from enabled configured sources, including
 normal database upserts and source-run measurements. `--enable-local-writes`
 still grants only saving and preparation. No flag grants source changes,
-applicant/profile edits, submission, shell, SQL, arbitrary paths or arbitrary HTTP.
+verified applicant edits, submission, shell, SQL, arbitrary paths or arbitrary HTTP.
+
+`--enable-applicant-profile-read` independently authorizes profile, readiness,
+structured answers and detailed eligibility evidence. It is also required for
+`get_job_eligibility`, `search_eligible_jobs`, `trial_source` and
+`prepare_application`, whose outputs depend on private applicant facts.
+`--enable-applicant-fact-proposals` additionally authorizes unverified proposals;
+it never confirms them. Job-only clients retain ordinary local job searches.
+`manage_applicant_facts` is trusted local CLI authority, not an MCP tool/flag.
+See [Applicant profile and readiness](APPLICANT_PROFILE.md) for the complete model,
+import, correction, confirmation, privacy and agent-portability workflow.
 
 The workspace defaults to the startup working directory. An explicit workspace
 must exist. It selects the existing `jobpipe.db`, `data/` configuration,
@@ -86,6 +96,17 @@ return `items`, `total`, `limit`, `offset`, and nullable `next_offset`.
 | `get_discovery_status` | Optional `run_id` | Latest completed measurement timestamp, running operations, selected run/source outcomes, aggregate counts, current corpus concentration and stale warnings |
 | `get_job_eligibility` | `job_id`, optional registered `applicant_profile` name | Canonical technical-fit score and independent eligibility assessment |
 | `search_eligible_jobs` | Optional `query`, canonical `role_family`, `remote_preference` (`remote_us`, `remote`, `any`), `minimum_fit_score`, `eligibility_status`, pagination | Canonical summaries with eligibility and resolved goal |
+| `get_applicant_profile` | Optional `sections`; defaults exclude identity/contact | Facts, provenance, verification, proposals/conflicts, missing fields, storage mode and profile revision |
+| `get_applicant_readiness` | Optional unique `job_ids` (1–100) or `query`, `job_limit` (1–100), `limit` (1–20, default 5) | Verified keys, missing/conflicting facts, blockers, affected jobs and questions |
+| `get_application_readiness` | `job_id` | Eligibility, package status, blocked/ready-for-human-review readiness, facts and next action |
+| `get_readiness_questions` | Same bounded selection as applicant readiness | Deduplicated questions with potentially affected jobs; employer uncertainties separate; search truncation disclosed |
+| `propose_applicant_facts` | `expected_revision`, `facts` (1–50 unique keys with typed values, optional reference/explanation) | Proposal IDs, review state, revision and changed flag; never verification |
+| `get_application_answer` | `job_id`, `question_type`, optional `country` and `experience_area` | Answerable/unknown/needs-review/unsupported, exact question, typed answer and fact provenance |
+
+`prepare_application` additionally accepts `mode`, default `ready_for_submission`.
+Use `draft_preparation` explicitly for needs-review jobs. Its output adds the
+actual stored mode and structured `readiness`; an existing draft is never
+silently promoted when reused.
 
 ### Discovery runs and trials
 
@@ -135,7 +156,7 @@ are not professional employment. Experience ranges retain both bounds, including
 the uncertain upper bound in `2–12+ years`. Explicit future-role and talent-pool titles
 require employer review before readiness is asserted.
 
-The default applicant is `data/profiles/candidate.yaml`. Optional applicant names
+Before explicit profile cutover, the default applicant is `data/profiles/candidate.yaml`. Optional applicant names
 resolve existing files in that directory; paths and symlinks are rejected.
 Legacy files remain valid, with missing facts unknown. An optional `eligibility`
 mapping supports country-specific `work_authorizations`, `citizenship_countries`,
@@ -159,10 +180,19 @@ eligibility:
 
 Only facts marked verified are used. Unknown fields should be omitted, not filled
 with zero or false. Packaged templates contain no private applicant facts. The
-workspace records only facts the user confirmed during planning; residence,
+workspace may contain previously confirmed facts; missing residence,
 experience and enrollment remain unresolved. Neither MCP discovery flag can
 write applicant facts. An assessment using another profile cannot bypass the
 preparation gate, which always rechecks the active persisted applicant.
+
+After `jobpipe applicant import --accept`, SQLite becomes the canonical source
+for the active applicant. Existing verified YAML facts retain evidence after
+local import approval; ordinary imported facts remain unverified. Profile files
+are preserved and no longer serve as live applicant overrides. MCP proposals
+record agent origin and remain unverified until the applicant uses
+`jobpipe applicant review`. There is no ordinary MCP confirmation argument or
+tool. Corrections and confirmations retain history. Current assessments include
+profile revision and configuration fingerprint and recompute on demand.
 
 Eligibility search defaults to confirmed eligible jobs. Request `needs_review`
 explicitly to inspect uncertainties, or `all` to compare categories. Evaluation
@@ -209,16 +239,19 @@ Running/aborted measurements are excluded. CLI history reporting remains availab
 
 ## Permissions and write behavior
 
-All fourteen tools remain discoverable in every mode. Read-only mode rejects
+All twenty tools remain discoverable in every mode. Default mode rejects
 network trials, ingestion and local writes with `permission_denied` before
-database/network access. Tool arguments
+database/network access, and additionally rejects applicant reads/proposals.
+Section filtering applies to profile values and provenance. Tool arguments
 cannot grant capabilities. `--enable-local-writes` authorizes only saving an
 existing review record and preparing its local application bundle.
 
-MCP preparation additionally requires current confirmed eligibility; ineligible
-and needs-review jobs return `eligibility_unresolved`, including on bundle reuse.
+Default MCP preparation additionally requires current confirmed eligibility;
+ineligible and needs-review jobs return `eligibility_unresolved`, including on
+bundle reuse. Explicit `draft_preparation` allows needs-review jobs with visible
+draft labels and blocked readiness. Ineligible MCP preparation remains denied.
 Saving remains available for investigation. Manual CLI/web preparation retains
-existing transitions and returns eligibility concerns without asserting readiness.
+existing transitions and labels unresolved/ineligible new materials as blocked drafts.
 
 Save is idempotent: an already-saved review record receives no additional
 feedback or timestamp changes. Independent applied/interview/offer statuses are
@@ -234,6 +267,14 @@ are preserved and rejected: inspect and move them aside manually before retrying
 Symlink destinations/artifacts are rejected. New bundles are rendered into a
 temporary sibling directory and published together after successful rendering.
 Database transactions serialize shared-service write operations.
+
+Canonical-profile packages store profile revision, job/search context, verified
+fact references and artifact hashes in local SQLite metadata. Draft, stale,
+legacy, incomplete and edited bundles remain blocked until appropriate local
+review/replacement; they are never silently rewritten. A current eligible package
+with required verified contact information can be `ready_for_human_review`.
+That status is not employer-form completion, external execution authorization,
+or submission. No package operation marks an application applied.
 
 MCP records each workflow feedback event once but does **not** regenerate
 `data/learned_weights.yaml`. A later user-initiated synchronization can incorporate
@@ -254,9 +295,11 @@ Errors carry an actionable message and one of `invalid_arguments`, `unknown_job`
 `missing_database`, `invalid_database`, `configuration_error`,
 `invalid_state_transition`, `permission_denied`,
 `application_preparation_failure`, `eligibility_unresolved`, `unknown_source`,
-`unknown_run`, `operation_in_progress`, `operation_timeout`, or `internal_error`. Tool failures set MCP's
+`unknown_run`, `operation_in_progress`, `operation_timeout`, `profile_conflict`,
+`profile_setup_required`, or `internal_error`. Tool failures set MCP's
 `isError` flag. Normal responses contain no traceback; diagnostic exceptions are
-logged to stderr. Stdout is reserved for MCP. EOF and interruption shut down the
+logged to stderr, with private applicant-operation failures summarized without
+their values. Stdout is reserved for MCP. EOF and interruption shut down the
 server and terminate its owned discovery workers. Hard worker deadlines also
 bound an orphan after abrupt parent death. An abandoned run is reconciled on the
 next authorized ingestion while holding the workspace lock; reads never repair
@@ -275,7 +318,8 @@ codex mcp list
 
 In a Codex session, inspect `/mcp`, then ask it to call `get_active_goal` and
 `search_jobs` with `limit=5`. To approve local writes, add
-`--enable-local-writes` to the server arguments in your configuration and restart
+`--enable-local-writes` to the server arguments in your configuration; preparation
+also needs `--enable-applicant-profile-read`. Restart
 the connection. Codex also supports a `[mcp_servers.jobpipe]` TOML entry with
 `command`, `args`, and optional `cwd`.
 
@@ -320,8 +364,9 @@ ignored by Git. Separate raw-stdio coverage checks protocol-only stdout and EOF.
 
 ## Current limitations
 
-Agents can discover, evaluate, save and prepare through the fourteen tools above.
-Source configuration, applicant facts, goal edits, arbitrary status updates and
+Agents can discover, evaluate, propose applicant facts, save and prepare through
+the twenty tools above, subject to independent capabilities and local applicant confirmation.
+Source configuration, applicant confirmation/management, goal edits, arbitrary status updates and
 external submission remain outside MCP. Search evaluates the local corpus
 in memory; it adds no index. There is no hosted endpoint or authentication layer:
 the local client controls the launched process and startup permission flag.

@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import closing
 from dataclasses import asdict
 from datetime import date, datetime, timezone
+import json
 import sqlite3
 from typing import Any
 
@@ -285,25 +286,38 @@ def save_job(job_id: int, reason: str | None = None, note: str | None = None, *,
     return {key: result[key] for key in ("job_id", "status", "review_status", "application_status", "workflow_bucket")} | {"changed": changed}
 
 
-def prepare_application(job_id: int, reason: str | None = None, note: str | None = None, *, sync_learning: bool = False, require_eligible: bool = False) -> dict[str, Any]:
+def prepare_application(job_id: int, reason: str | None = None, note: str | None = None, *, sync_learning: bool = False, require_eligible: bool = False, mode: str = "ready_for_submission") -> dict[str, Any]:
     """Reuse complete bundles and record one preparation event; never submit."""
+    from .applicant_profile import get_applicant_profile, state, verified_values
+    from .applicant_models import SECTIONS
+    from .readiness import artifact_hashes, context_fingerprint, get_application_readiness
+    if mode not in {"ready_for_submission", "draft_preparation"}:
+        raise ValueError("Unknown preparation mode")
     with closing(db.connect(mode="rw")) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
         job = require_job(job_id)
         if job["status"] not in {"saved", "packaged"}:
             raise ServiceError("invalid_state_transition", "Run save before package.")
-        assessment = get_job_eligibility(job_id)["eligibility"] if require_eligible else None
-        if assessment is not None and assessment["status"] != "eligible":
+        assessment = get_job_eligibility(job_id)["eligibility"]
+        if require_eligible and (assessment["status"] == "ineligible" or (assessment["status"] != "eligible" and mode != "draft_preparation")):
             raise ServiceError("eligibility_unresolved", f"Preparation requires confirmed eligibility ({assessment['status']}). Use get_job_eligibility and resolve its evidence gaps first.")
+        if not require_eligible and assessment["status"] != "eligible":
+            mode = "draft_preparation"
         try:
             reused = existing_package(job) is not None
-            paths = build_application_package(job_id)
+            paths = build_application_package(job_id, preparation_mode=mode)
         except (ValueError, OSError) as exc:
             raise ServiceError("application_preparation_failure", str(exc)) from exc
         recorded = conn.execute("SELECT 1 FROM feedback WHERE job_id = ? AND action = 'packaged'", (job_id,)).fetchone()
         if recorded is None:
             conn.execute("INSERT INTO feedback (job_id, action, reason_codes, note, created_at) VALUES (?, ?, ?, ?, ?)",
                          (job_id, "packaged", reason, note, now_iso()))
+        if not reused and state(conn)["active"]:
+            snapshot = get_applicant_profile(list(SECTIONS))
+            conn.execute("INSERT OR REPLACE INTO application_package_provenance VALUES (?,?,?,?,?,?,?)",
+                         (job_id, snapshot["revision"], context_fingerprint(scoring_job(job)), mode,
+                          json.dumps({k: v["revision_id"] for k, v in verified_values(snapshot).items()}, sort_keys=True),
+                          json.dumps(artifact_hashes(job), sort_keys=True), now_iso()))
     if recorded is None and sync_learning:
         sync_weights()
     result = get_job(job_id)
@@ -316,10 +330,15 @@ def prepare_application(job_id: int, reason: str | None = None, note: str | None
             concerns.append("Application eligibility could not be assessed; inspect applicant configuration.")
     if reused:
         concerns.append("Existing materials reused unchanged; they may reflect an older profile or job description.")
+        from .readiness import package_record
+        previous = package_record(job_id)
+        if previous:
+            mode = previous["mode"]
     return {key: result[key] for key in ("job_id", "status", "review_status", "application_status", "workflow_bucket")} | {
         "package_directory": str(paths.directory), "resume_path": str(paths.resume_tailored_md),
         "cover_note_path": str(paths.cover_note_md), "fit_analysis_path": str(paths.fit_md),
-        "application_instruction_path": str(paths.apply_md), "validation_concerns": concerns, "reused": reused}
+        "application_instruction_path": str(paths.apply_md), "validation_concerns": concerns, "reused": reused,
+        "mode": mode, "readiness": get_application_readiness(job_id)}
 
 
 def get_job_eligibility(job_id: int, applicant_profile: str | None = None) -> dict[str, Any]:
@@ -363,3 +382,5 @@ followup_due = is_followup_due
 
 # Fixed service facade shared by adapters; imports do not start network/workers.
 from .discovery_service import ingest_sources, trial_source, get_discovery_status
+from .applicant_profile import get_applicant_profile, propose_applicant_facts
+from .readiness import get_applicant_readiness, get_application_readiness, get_readiness_questions, get_application_answer

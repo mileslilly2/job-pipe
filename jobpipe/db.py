@@ -11,6 +11,7 @@ from .catalog import load_search_profile
 from .classification import classify_job as classify_canonical_job
 from .score import score_job_fit_v1
 from .utils import db_path, dump_json, ensure_dir, now_iso
+from .applicant_schema import APPLICANT_SCHEMA
 
 
 SCHEMA = """
@@ -134,6 +135,8 @@ CREATE TABLE IF NOT EXISTS source_run_stats (
 CREATE INDEX IF NOT EXISTS idx_ingest_runs_completed ON ingest_runs(status, completed_at, id);
 CREATE INDEX IF NOT EXISTS idx_source_run_stats_source ON source_run_stats(source_id, run_id);
 """
+
+SCHEMA += APPLICANT_SCHEMA
 
 
 def connect(path: Path | None = None, *, mode: str = "rwc") -> sqlite3.Connection:

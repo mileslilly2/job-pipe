@@ -51,6 +51,7 @@ class ApplicantFacts(BaseModel):
     graduation_year: VerifiedFact[int] | None = None
     languages: VerifiedFact[list[str]] | None = None
     native_languages: VerifiedFact[list[str]] | None = None
+    language_proficiencies: dict[str, VerifiedFact[str]] = Field(default_factory=dict)
     credentials: VerifiedFact[list[str]] | None = None
     restricted_employers: VerifiedFact[list[str]] | None = None
     allowed_employment_types: VerifiedFact[list[str]] | None = None
@@ -71,6 +72,7 @@ class Check(BaseModel):
     status: EligibilityStatus
     evidence: list[str] = Field(default_factory=list)
     concerns: list[str] = Field(default_factory=list)
+    applicant_fact_keys: list[str] = Field(default_factory=list)
 
 
 class Assessment(BaseModel):
@@ -84,10 +86,12 @@ class Assessment(BaseModel):
     location_scope: str
     hiring_countries: list[str]
     experience_requirements: list[dict[str, Any]]
+    profile_revision: int = 0
+    configuration_fingerprint: str = ""
     scope: str = "Stated posting requirements and verified applicant facts; availability and complete employer policy are not certified."
 
 
-def load_applicant(name: str | None = None) -> tuple[ApplicantFacts, dict[str, Any]]:
+def _load_legacy_applicant(name: str | None = None) -> tuple[ApplicantFacts, dict[str, Any]]:
     """Resolve registered profile files by name only, never caller-supplied paths."""
     selected = name or "candidate"
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", selected):
@@ -101,6 +105,13 @@ def load_applicant(name: str | None = None) -> tuple[ApplicantFacts, dict[str, A
     if not isinstance(raw, dict):
         raise ValueError("Candidate profile must be a YAML mapping.")
     return ApplicantFacts.model_validate(raw.get("eligibility", {})), raw
+
+
+def load_applicant(name: str | None = None) -> tuple[ApplicantFacts, dict[str, Any]]:
+    from .applicant_profile import eligibility_snapshot, state
+    if name in {None, "candidate"} and state()["active"]:
+        return eligibility_snapshot()
+    return _load_legacy_applicant(name)
 
 
 COUNTRIES = {
@@ -177,6 +188,34 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
         checks[name] = Check(status=status, evidence=evidence or [], concerns=[concern] if concern else [])
         if applicant_gap:
             missing_applicant.append(applicant_gap)
+            keys: list[str] = []
+            if name == "location":
+                keys = ["residence.country"] if "country" in applicant_gap else ["residence.state"] if "state" in applicant_gap.lower() else ["residence.commute_locations"]
+            elif name == "work_authorization":
+                keys = ([f"work_authorization.{auth_country}.sponsorship_required"] if "sponsorship requirement" in applicant_gap.lower()
+                        else ["qualifications.citizenship_countries"] if "citizenship" in applicant_gap.lower()
+                        else [f"work_authorization.{auth_country}.authorized"] if auth_country else [])
+            elif name == "experience":
+                keys = ["qualifications.professional_experience_years"] if years is None else []
+                for area in ("python", "java", "javascript", "sql", "backend", "data engineering", "software engineering", "customer support", "technical support"):
+                    if any(re.search(r"\b" + re.escape(area) + r"\b", r.evidence, re.I) for r in mandatory):
+                        keys.append(f"qualifications.{area.replace(' ', '_')}.professional_experience_years")
+            elif name == "internship":
+                keys = ["education.enrolled"]
+                if school_countries:
+                    keys.append("education.institution_country")
+                if grad_years:
+                    keys.append("education.graduation_year")
+            elif name in {"additional_requirements", "language_proficiency"}:
+                from .applicant_profile import _record_id
+                text = " ".join(special if name == "additional_requirements" else native).lower()
+                for language in ("english", "spanish", "french", "german", "portuguese", "japanese", "italian", "chinese simplified", "chinese traditional"):
+                    if language in text:
+                        rid = candidate.get("language_record_ids", {}).get(language, _record_id(language))
+                        keys.extend([f"languages.{rid}.name", f"languages.{rid}.proficiency"])
+                if re.search(r"bachelor|master|degree|certification", text):
+                    keys.append("qualifications.credentials")
+            checks[name].applicant_fact_keys = list(dict.fromkeys(keys))
         if employer_gap:
             missing_employer.append(employer_gap)
 
@@ -304,6 +343,9 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
         check("work_authorization", "ineligible" if citizenship is not None else "needs_review", auth_evidence,
               "Required citizenship is not established." if citizenship is None else "Verified citizenship does not meet the explicit restriction.",
               applicant_gap="Verified citizenship meeting the explicit restriction." if citizenship is None else None)
+    elif candidate.get("authorization_restrictions", {}).get(auth_country):
+        check("work_authorization", "needs_review", auth_evidence, "Verified authorization has restrictions requiring employer review.",
+              employer_gap="Confirm whether the stated authorization restrictions permit this position.")
     else:
         check("work_authorization", evidence=auth_evidence)
 
@@ -350,6 +392,9 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
                 check("experience", evidence=exp_evidence or ["No mandatory numeric experience requirement identified in the supplied posting; no project/employment equivalence inferred."])
 
     from .classification import classify_seniority
+    if candidate.get("experience_ranges") and checks["experience"].status == "needs_review":
+        checks["experience"].concerns.append("Attested experience is a range; exact professional years are not established.")
+        missing_employer.append("Review mandatory experience bounds against the attested range; no exact years were invented.")
     level = job.get("canonical_seniority") or classify_seniority(title)[0]
     if level in profile.excluded_levels:
         check("role_level", "ineligible", [f"Explicit role seniority: {level}; title: {title}"],
@@ -397,7 +442,7 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
 
     # Do not silently bless explicit credentials/language restrictions that the
     # numeric experience and location checks cannot establish.
-    special = [s for s in clauses if re.search(r"(?:must|required|require|minimum).{0,80}(?:bachelor|master|degree|fluent|fluency|certification)|(?:bachelor|master|degree|fluency|certification).{0,80}(?:required|mandatory)", s, re.I)]
+    special = [s for s in clauses if re.search(r"(?:must|required|require|minimum).{0,80}(?:bachelor|master|degree|fluent|fluency|certification)|(?:bachelor|master|degree|fluent|fluency|certification).{0,80}(?:required|mandatory)", s, re.I)]
     if special:
         special_evidence = [f"Posting: {s}" for s in special]
         languages = _value(applicant.languages)
@@ -411,6 +456,9 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
             required_languages = {v for v in ("english", "spanish", "french", "german", "portuguese", "japanese")
                                   if re.search(r"\b" + v + r"\b", clause, re.I)}
             if required_languages and re.search(r"fluent|fluency|language", clause, re.I):
+                # An explicitly confirmed lower level is a stated mandatory
+                # mismatch; an absent language remains unknown, not negative.
+                mismatch |= any(_value(applicant.language_proficiencies.get(language)) in {"basic", "limited_working", "professional_working"} for language in required_languages)
                 if languages is None:
                     unresolved = True
                 else:
@@ -452,9 +500,27 @@ def assess_eligibility(job: Any, applicant: ApplicantFacts,
             check("language_proficiency", "needs_review", native_evidence,
                   "Native-level language proficiency requires explicit verification.",
                   applicant_gap="Verified proficiency at the explicitly required language level.")
+    # Relevant contradictory proposals withhold the affected conclusion, while
+    # preserving the accepted value in history and unrelated proved blockers.
+    for key in candidate.get("conflicting_keys", []):
+        section = key.split(".")[0]
+        affected = {"residence": "location", "work_authorization": "work_authorization", "education": "internship", "languages": "additional_requirements"}.get(section)
+        if key.startswith("qualifications."):
+            affected = "experience" if "experience" in key else "additional_requirements"
+        if key.startswith("preferences."):
+            affected = "employment_type"
+        if affected in checks and checks[affected].status == "eligible":
+            checks[affected].status = "needs_review"
+            checks[affected].concerns.append("Conflicting applicant information requires local review.")
+            checks[affected].applicant_fact_keys.append(key)
+            missing_applicant.append("Resolve conflicting applicant information: " + key)
     statuses = [v.status for v in checks.values()]
     status: EligibilityStatus = "ineligible" if "ineligible" in statuses else "needs_review" if "needs_review" in statuses else "eligible"
+    import hashlib
+    import json
     return Assessment(status=status, checks=checks,
+        profile_revision=candidate.get("profile_revision", 0),
+        configuration_fingerprint=hashlib.sha256(json.dumps(profile.model_dump(), sort_keys=True).encode()).hexdigest(),
         evidence=list(dict.fromkeys(e for c in checks.values() for e in c.evidence)),
         concerns=list(dict.fromkeys(e for c in checks.values() for e in c.concerns)),
         missing_applicant_information=list(dict.fromkeys(missing_applicant)),
