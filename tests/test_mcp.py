@@ -34,7 +34,9 @@ from jobpipe.source_metrics import build_source_metrics, finish_ingest_run, reco
 from jobpipe.tracker import update_status
 from jobpipe.utils import package_dir
 
-TOOLS = {"search_jobs", "get_job", "get_fit_breakdown", "list_applications", "get_source_yield", "get_active_goal", "get_followups", "save_job", "prepare_application"}
+TOOLS = {"search_jobs", "get_job", "get_fit_breakdown", "list_applications", "get_source_yield",
+         "get_active_goal", "get_followups", "save_job", "prepare_application", "ingest_sources",
+         "trial_source", "get_discovery_status", "get_job_eligibility", "search_eligible_jobs"}
 
 
 @pytest.fixture()
@@ -42,6 +44,13 @@ def agent_workspace(workspace, monkeypatch):
     for name in ("data", "role_packs", "templates"):
         shutil.copytree(package_dir() / name, workspace / name)
     shutil.copyfile(package_dir() / "profile.md", workspace / "profile.md")
+    candidate_path = workspace / "data/profiles/candidate.yaml"
+    candidate = yaml.safe_load(candidate_path.read_text())
+    candidate["eligibility"] = {
+        "residence_country": {"value": "US", "verified": True, "evidence": "Synthetic acceptance applicant."},
+        "work_authorizations": [{"country": "US", "authorized": True, "sponsorship_required": False,
+                                 "verified": True, "evidence": "Synthetic acceptance authorization."}]}
+    candidate_path.write_text(yaml.safe_dump(candidate))
     monkeypatch.setattr("jobpipe.learn.WEIGHTS_FILE", workspace / "data" / "learned_weights.yaml")
     (workspace / "data" / "learned_weights.yaml").write_text("role_families:\n  data_engineering: -2\nkeywords: {}\n")
     db.init_database()
@@ -107,8 +116,8 @@ def test_discovery_and_typed_schemas(agent_workspace):
                 assert tool.description
                 jsonschema.Draft202012Validator.check_schema(tool.input_schema)
                 jsonschema.Draft202012Validator.check_schema(tool.output_schema)
-                assert tool.annotations.read_only_hint == (tool.name not in {"save_job", "prepare_application"})
-                args = {"job_id": 1} if tool.name in {"get_job", "get_fit_breakdown", "save_job", "prepare_application"} else {}
+                assert tool.annotations.read_only_hint == (tool.name not in {"save_job", "prepare_application", "ingest_sources"})
+                args = {"job_id": 1} if tool.name in {"get_job", "get_fit_breakdown", "get_job_eligibility", "save_job", "prepare_application"} else {}
                 response = await client.call_tool(tool.name, args)
                 jsonschema.validate(response.structured_content, tool.output_schema)
     asyncio.run(run())
@@ -212,10 +221,10 @@ def test_uninitialized_database(workspace, condition):
     before = snapshot(workspace)
     async def run():
         async with stdio_client(workspace, writes=True) as client:
-            assert len((await client.list_tools()).tools) == 9
+            assert len((await client.list_tools()).tools) == 14
             assert (await invoke(client, "get_active_goal"))["configuration_origin"] == "built_in"
-            for tool in TOOLS - {"get_active_goal"}:
-                args = {"job_id": 1} if tool in {"get_job", "get_fit_breakdown", "save_job", "prepare_application"} else {}
+            for tool in TOOLS - {"get_active_goal", "trial_source", "ingest_sources"}:
+                args = {"job_id": 1} if tool in {"get_job", "get_fit_breakdown", "save_job", "prepare_application", "get_job_eligibility"} else {}
                 await invoke(client, tool, args, error="missing_database" if condition == "missing" else "invalid_database")
     asyncio.run(run())
     assert snapshot(workspace) == before
@@ -320,7 +329,7 @@ def test_inprocess_operations_are_offline(agent_workspace, monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", forbidden)
     async def run():
         async with Client(create_server(enable_local_writes=True)) as client:
-            assert len((await client.list_tools()).tools) == 9
+            assert len((await client.list_tools()).tools) == 14
             await invoke(client, "get_active_goal")
             await invoke(client, "search_jobs")
             await invoke(client, "get_source_yield")
@@ -388,7 +397,7 @@ def test_stdio_stdout_is_only_protocol(workspace):
         assert receive(1)["result"]["serverInfo"]["name"] == "jobpipe"
         send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         send({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        assert len(receive(2)["result"]["tools"]) == 9
+        assert len(receive(2)["result"]["tools"]) == 14
         process.stdin.close()
         assert process.wait(timeout=15) == 0
         assert process.stdout.read() == ""

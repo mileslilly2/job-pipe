@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
 
 from .models import FactReport, JobFacts, ProfileFacts, SearchProfile
@@ -95,9 +96,9 @@ EXPERIENCE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(\d{1,2})(?:\.\d+)?\s+years?\s+experience\b", re.I),
 ]
 
-INTERN_SIGNS = ("internship", "intern", "co-op", "coop", "student", "new grad")
+INTERN_SIGNS = ("internship", "intern", "co-op", "coop", "student")
 APPRENTICE_SIGNS = ("apprentice", "apprenticeship", "trainee")
-ENTRY_SIGNS = ("entry level", "entry-level", "level i", "level 1", "tier i", "tier 1", "analyst i", "specialist i", "associate")
+ENTRY_SIGNS = ("entry level", "entry-level", "level i", "level 1", "tier i", "tier 1", "analyst i", "specialist i", "associate", "new grad")
 JUNIOR_SIGNS = ("junior", "jr.", "jr ", "junior-", "junior ")
 SENIOR_SIGNS = ("senior", "sr.", " sr ")
 STAFF_SIGNS = ("staff engineer", "staff software engineer", "staff ")
@@ -146,13 +147,10 @@ def classify_role_family(job: Any) -> tuple[str, list[str], str | None]:
 
 
 def extract_experience_min_years(text: str) -> int | None:
-    best: int | None = None
-    for pattern in EXPERIENCE_PATTERNS:
-        for match in pattern.finditer(text):
-            value = int(float(match.group(1)))
-            if best is None or value > best:
-                best = value
-    return best
+    from .experience import extract_experience_requirements
+    values = [r.minimum for r in extract_experience_requirements(text)
+              if not r.preferred and r.minimum is not None]
+    return math.ceil(max(values)) if values else None
 
 
 def classify_seniority(job: Any, experience_min_years: int | None = None) -> tuple[str, list[str]]:
@@ -178,6 +176,10 @@ def classify_seniority(job: Any, experience_min_years: int | None = None) -> tup
     if _has_any(title, list(INTERN_SIGNS)):
         return "internship", ["title indicates internship-level role"]
 
+    # Only explicit role-scope clauses can supply description seniority. Company
+    # biographies, benefits and internship programs do not describe this role.
+    body = " ".join(part for part in re.split(r"[\n.!?;]", body)
+                    if re.search(r"(?:this (?:role|position) (?:is|requires)|you (?:will|must)|we (?:seek|require)|experience required)", part))
     if _has_any(body, list(MANAGER_SIGNS)):
         return "manager", ["description indicates manager-level scope"]
     if _has_any(body, list(PRINCIPAL_SIGNS)):
@@ -192,7 +194,7 @@ def classify_seniority(job: Any, experience_min_years: int | None = None) -> tup
         return "entry", ["description indicates entry-level scope"]
     if _has_any(body, list(APPRENTICE_SIGNS)):
         return "apprenticeship", ["description indicates apprenticeship-level scope"]
-    if _has_any(body, list(INTERN_SIGNS)):
+    if re.search(r"(?:this (?:role|position) is an? internship|we (?:seek|require) an? intern)\b", body):
         return "internship", ["description indicates internship-level scope"]
 
     if years is not None:

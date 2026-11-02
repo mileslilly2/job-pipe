@@ -125,19 +125,20 @@ def test_latest_run_skips_aborted_and_running_runs(initialized_workspace, runner
 
 
 def test_ingest_abort_is_recorded(initialized_workspace, runner, monkeypatch):
-    import jobpipe.cli as cli
+    import jobpipe.db as db
     import jobpipe.providers as providers
     configure(source())
     monkeypatch.setitem(providers.PROVIDER_FETCHERS, "greenhouse", lambda _: [posting()])
     def fail(*args, **kwargs):
         raise RuntimeError("database insertion failed")
-    monkeypatch.setattr(cli, "insert_job", fail)
+    monkeypatch.setattr(db, "insert_job", fail)
     result = runner.invoke(app, ["ingest"])
     assert result.exit_code != 0
     report = build_source_metrics([source()])
     assert report.runs[0]["status"] == "aborted"
     assert "database insertion failed" in report.runs[0]["error"]
-    assert report.stats[0]["passed"] == 1 and report.stats[0]["inserted"] == 0
+    assert report.stats[0]["fetch_status"] == "failed"
+    assert report.stats[0]["inserted"] == 0  # The unfinished source transaction rolled back.
 
 
 def test_corpus_attribution_and_concentration(initialized_workspace):

@@ -162,12 +162,14 @@ Useful focused checks:
 - Grow the knowledge graph and role packs for additional job families.
 - Keep adding regression tests around ingest, packaging, and dashboard filters as the workspace evolves.
 
-## Agent interface (v0.2.0)
+## Agent interface (v0.3.0)
 
-Job-Pipe exposes nine typed local MCP tools for job search, fit explanations,
-application history, source yield, goals, follow-ups, saving, and package
-preparation. The stdio server is read-only by default; local writes require
-`--enable-local-writes`. No application is submitted externally.
+Job-Pipe exposes fourteen typed MCP tools for controlled source refresh and trials,
+canonical search and scoring, evidence-based eligibility, tracking, saving, and
+application preparation. Read-only is the default. Network trials require
+`--enable-source-trials`, ingestion requires `--enable-ingest`, and saving/package
+preparation requires `--enable-local-writes`. MCP preparation requires confirmed
+eligibility; no application is submitted externally.
 
 See [the agent interface guide](docs/AGENT_INTERFACE.md) for installation,
 Codex/Antigravity setup, permissions, schemas, and protocol validation.

@@ -567,37 +567,14 @@ def ingest(diagnostics: bool = typer.Option(False, "--diagnostics", help="Print 
     else:
         console.print("Using configured job sources from data/job_sources.yaml.")
     console.print(f"Using active search profile {active_profile.name}.")
-    run_id = start_ingest_run(active_profile)
-    inserted = 0
-    updated = 0
-    try:
-        report = collect_discovery_diagnostics(sources, active_profile)
-        for source_report in report.source_reports:
-            record_source_run(run_id, source_report)
-            if source_report.status == "failed":
-                console.print(f"[red]Failed to ingest {source_report.label}[/red] {source_report.error}")
-                continue
-            source_inserted = source_updated = 0
-            try:
-                for job in source_report.accepted_jobs:
-                    payload = job.model_dump()
-                    payload["source_id"] = source_report.label
-                    payload["fit_score"], _notes = score_job_fit_v1(payload, profile=active_profile)
-                    payload["status"] = "new"
-                    existing = get_job_by_provider_external_id(job.provider, job.external_id)
-                    insert_job(payload, review_status="new")
-                    if existing is None:
-                        source_inserted += 1
-                        inserted += 1
-                    else:
-                        source_updated += 1
-                        updated += 1
-            finally:
-                record_source_run(run_id, source_report, inserted=source_inserted, updated=source_updated)
-    except BaseException as exc:
-        finish_ingest_run(run_id, error=f"{type(exc).__name__}: {exc}")
-        raise
-    finish_ingest_run(run_id)
+    from .discovery_service import ingest_sync
+    run_id, report = ingest_sync(sources, active_profile)
+    source_stats = run_stats(build_source_metrics(sources), run_id)
+    inserted = sum(item["inserted"] for item in source_stats.values())
+    updated = sum(item["updated"] for item in source_stats.values())
+    for source_report in report.source_reports:
+        if source_report.status == "failed":
+            console.print(f"[red]Failed to ingest {source_report.label}[/red] {source_report.error}")
     console.print(f"Fetched {report.fetched_count} job(s). Filtered out {report.rejected_count} job(s). Inserted {inserted} new job(s). Updated {updated} existing job(s).")
     if diagnostics or false_negative_audit:
         _print_discovery_diagnostics(report, active_counts=_active_source_counts())
@@ -1367,26 +1344,13 @@ def sources_yield(history: bool = typer.Option(False, "--history", help="Show co
 @sources_app.command("trial")
 def sources_trial(source_id: str = typer.Argument(..., help="Configured company/name/token or provider:token; catalog sources are also accepted.")) -> None:
     """Fetch and filter one source with production rules and zero local writes."""
-    sources, packs = _source_catalog()
-    selected = [source for source in sources if _source_matches_identifier(source, source_id)]
-    if not selected:
-        # Choose the first catalog definition in sorted pack order, and disclose it.
-        catalog = {}
-        for pack, members in sorted(packs.items()):
-            for source in members:
-                catalog.setdefault(source_identity_label(source), (source, pack))
-        selected = [source for source, _pack in catalog.values() if _source_matches_identifier(source, source_id)]
-        if len(selected) == 1:
-            console.print(f"Catalog definition: {catalog[source_identity_label(selected[0])][1]} (pack rules; configuration unchanged)")
-    by_id = {source_identity_label(source): source for source in selected}
-    if not by_id:
-        raise typer.BadParameter(f"Source {source_id!r} not found in configured sources or source packs.")
-    if len(by_id) != 1:
-        raise typer.BadParameter(f"Ambiguous source {source_id!r}; use one of: {', '.join(sorted(by_id))}")
-    source = next(iter(by_id.values()))
-    profile = _load_active_profile()
-    # Override enabled only in memory so explicitly selected disabled boards run.
-    report = collect_discovery_diagnostics([source.model_copy(update={"enabled": True})], profile).source_reports[0]
+    from .discovery_service import run_trial
+    try:
+        report, profile, origin = run_trial(source_id)
+    except services.ServiceError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if origin != "workspace":
+        console.print(f"Catalog definition: {origin} (pack rules; configuration unchanged)")
     print_trial(console, report, profile=profile.name, goal=profile.active_goal)
     if report.status == "failed":
         raise typer.Exit(code=1)

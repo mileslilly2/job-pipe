@@ -47,6 +47,10 @@ def classify_seniority(title: str) -> tuple[str, tuple[str, ...]]:
     text = _normal(title)
     for level, signals in (("executive", ("vp", "vice president", "chief")), ("director", ("director",)), ("manager", ("manager",)), ("lead", ("lead",)), ("principal", ("principal",)), ("staff", ("staff",)), ("senior", ("senior", "sr")), ("junior", ("junior", "jr")), ("apprentice", ("apprentice",)), ("intern", ("intern",)), ("entry_level", ("entry level", "associate", "analyst i", "engineer i")), ("senior", ("engineer iii",)), ("mid", ("engineer ii",))):
         if any(_has(text, item) for item in signals): return level, (f"title matched seniority token {next(item for item in signals if _has(text, item))!r}",)
+    if _has(text, "internship") or _has(text, "co op"):
+        return "intern", ("title explicitly identifies an internship",)
+    if _has(text, "new grad"):
+        return "entry_level", ("title explicitly identifies a new graduate role",)
     return "unknown", ("no explicit seniority token found",)
 
 def _text(job: Any, name: str) -> str:

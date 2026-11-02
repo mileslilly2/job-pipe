@@ -182,7 +182,7 @@ def get_job(job_id: int) -> dict[str, Any]:
             "classification": None if classification is None else {
                 **{k: classification[k] for k in ("primary_role_family", "seniority", "provenance")},
                 **{k: load_json(classification[k + "_json"]) for k in ("secondary_role_families", "role_evidence", "seniority_evidence")}},
-            "requirements": asdict(extract_job_requirements(raw)), "description": raw.get("description") or raw.get("raw_text") or "",
+            "requirements": asdict(extract_job_requirements(scoring_job(raw))), "description": raw.get("description") or raw.get("raw_text") or "",
             "application": dict(application) if application else None, "package_paths": package_paths(raw)}
 
 
@@ -285,13 +285,16 @@ def save_job(job_id: int, reason: str | None = None, note: str | None = None, *,
     return {key: result[key] for key in ("job_id", "status", "review_status", "application_status", "workflow_bucket")} | {"changed": changed}
 
 
-def prepare_application(job_id: int, reason: str | None = None, note: str | None = None, *, sync_learning: bool = False) -> dict[str, Any]:
+def prepare_application(job_id: int, reason: str | None = None, note: str | None = None, *, sync_learning: bool = False, require_eligible: bool = False) -> dict[str, Any]:
     """Reuse complete bundles and record one preparation event; never submit."""
     with closing(db.connect(mode="rw")) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
         job = require_job(job_id)
         if job["status"] not in {"saved", "packaged"}:
             raise ServiceError("invalid_state_transition", "Run save before package.")
+        assessment = get_job_eligibility(job_id)["eligibility"] if require_eligible else None
+        if assessment is not None and assessment["status"] != "eligible":
+            raise ServiceError("eligibility_unresolved", f"Preparation requires confirmed eligibility ({assessment['status']}). Use get_job_eligibility and resolve its evidence gaps first.")
         try:
             reused = existing_package(job) is not None
             paths = build_application_package(job_id)
@@ -305,6 +308,12 @@ def prepare_application(job_id: int, reason: str | None = None, note: str | None
         sync_weights()
     result = get_job(job_id)
     concerns = list(extract_job_requirements(job).concerns)
+    if not require_eligible:
+        try:
+            manual_assessment = get_job_eligibility(job_id)["eligibility"]
+            concerns.extend([f"Application eligibility: {manual_assessment['status']}.", *manual_assessment["concerns"]])
+        except ValueError:
+            concerns.append("Application eligibility could not be assessed; inspect applicant configuration.")
     if reused:
         concerns.append("Existing materials reused unchanged; they may reflect an older profile or job description.")
     return {key: result[key] for key in ("job_id", "status", "review_status", "application_status", "workflow_bucket")} | {
@@ -313,4 +322,44 @@ def prepare_application(job_id: int, reason: str | None = None, note: str | None
         "application_instruction_path": str(paths.apply_md), "validation_concerns": concerns, "reused": reused}
 
 
+def get_job_eligibility(job_id: int, applicant_profile: str | None = None) -> dict[str, Any]:
+    from .eligibility import assess_eligibility, load_applicant
+    applicant, raw = load_applicant(applicant_profile)
+    job = scoring_job(require_job(job_id))
+    return {"job_id": job_id, "technical_fit_score": job_score(job)[0],
+            "applicant_profile": applicant_profile or "candidate",
+            "eligibility": assess_eligibility(job, applicant, selected_profile(), raw).model_dump()}
+
+
+def search_eligible_jobs(query: str | None = None, role_family: str | None = None,
+                         remote_preference: str | None = None, minimum_fit_score: int = 0,
+                         eligibility_status: str = "eligible", limit: int = 20,
+                         offset: int = 0) -> dict[str, Any]:
+    from .eligibility import assess_eligibility, load_applicant
+    applicant, raw = load_applicant()
+    profile = selected_profile()
+    jobs = filter_jobs(decorate_jobs(db.list_jobs(), profile), query=query,
+                       min_score=minimum_fit_score, active_only=True)
+    items = []
+    for job in jobs:
+        if role_family and job.get("primary_role_family") != role_family:
+            continue
+        assessment = assess_eligibility(job, applicant, profile, raw)
+        if eligibility_status != "all" and assessment.status != eligibility_status:
+            continue
+        if remote_preference == "remote_us":
+            if not assessment.location_scope.startswith("remote_") or (assessment.location_scope != "remote_anywhere" and "US" not in assessment.hiring_countries):
+                continue
+        if remote_preference == "remote" and not assessment.location_scope.startswith("remote_"):
+            continue
+        items.append({**job_summary(job), "eligibility": assessment.model_dump()})
+    # decorate/filter already implement the canonical score/time/ID ordering.
+    order = {"eligible": 0, "needs_review": 1, "ineligible": 2}
+    items.sort(key=lambda item: order[item["eligibility"]["status"]])
+    return {**page(items, limit, offset), "goal": profile.active_goal}
+
+
 followup_due = is_followup_due
+
+# Fixed service facade shared by adapters; imports do not start network/workers.
+from .discovery_service import ingest_sources, trial_source, get_discovery_status

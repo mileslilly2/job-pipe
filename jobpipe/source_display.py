@@ -9,7 +9,7 @@ from rich.table import Table
 from .catalog import source_identity_label
 from .ingest import SourceDiscoveryReport
 from .models import JobSource
-from .source_metrics import SourceMetrics, completed_runs, format_rate, pack_metrics, rate, run_stats
+from .source_metrics import SourceMetrics, completed_runs, concentration, format_rate, pack_metrics, rate, run_stats
 
 
 def print_run(console: Console, report: SourceMetrics, run: dict[str, Any], sources: list[JobSource], *, latest: bool = True) -> dict[str, dict[str, Any]]:
@@ -56,8 +56,9 @@ def print_corpus(console: Console, report: SourceMetrics, sources: list[JobSourc
 
 
 def print_concentration(console: Console, report: SourceMetrics) -> None:
-    total = report.active_count
-    console.print(f"Active corpus: {total} | Employers represented: {len(report.employers)} | Sources represented: {len(report.active_sources)}")
+    summary = concentration(report)
+    total = summary["active_jobs"]
+    console.print(f"Active corpus: {total} | Employers represented: {summary['employers']} | Sources represented: {summary['sources']}")
     if report.unattributed_active:
         console.print(f"Active jobs with unknown source attribution: {report.unattributed_active}")
     for title, counts in (("employers", report.employers), ("sources", report.active_sources)):
@@ -71,7 +72,7 @@ def print_concentration(console: Console, report: SourceMetrics) -> None:
         for name, count in ranked[:5]:
             table.add_row(name, str(count), format_rate(rate(count, total)))
         console.print(table)
-    if total and report.employers and max(report.employers.values()) / total > 0.25:
+    if summary["warning"]:
         console.print("Concentration warning: one employer exceeds 25% of active jobs. Diagnostic only; no jobs suppressed.")
 
 

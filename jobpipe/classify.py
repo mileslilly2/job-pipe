@@ -70,6 +70,9 @@ def detect_seniority(job: ParsedJob, risk_score: int = 0, risk_flags: list[str] 
         return "apprenticeship", ["title indicates apprenticeship-level role"]
     if any(pattern in title for pattern in [" analyst i", " specialist i", " technician i", " level 1", " tier 1"]):
         return "entry_level", ["title indicates entry-level role"]
+    import re
+    if re.search(r"\b(?:intern|internship|co-op)\b", title):
+        return "internship", ["title indicates internship-level role"]
 
     if _has_any(body, ["director", "head of"]):
         flags.append("description indicates director-level scope")

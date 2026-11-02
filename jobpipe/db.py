@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import sqlite3
-from contextlib import closing
+from contextlib import closing, nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -222,7 +222,7 @@ def _manual_external_id(data: dict[str, Any]) -> str:
     return f"manual:{digest}"
 
 
-def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
+def insert_job(data: dict[str, Any], review_status: str | None = None, *, connection: sqlite3.Connection | None = None) -> int:
     timestamp = now_iso()
     provider = str(data.get("provider") or "manual")
     external_id = str(data.get("external_id") or data.get("source_url") or _manual_external_id(data))
@@ -254,7 +254,10 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
         "created_at": timestamp,
         "updated_at": timestamp,
     }
-    with connect() as conn:
+    with nullcontext(connection) if connection is not None else closing(connect()) as conn:
+        if connection is None:
+            with conn:
+                return insert_job(data, review_status, connection=conn)
         cur = conn.execute(
             """
             INSERT INTO jobs (
@@ -300,9 +303,10 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
             """,
             (job_id, timestamp, timestamp),
         )
-    existing = get_classification(job_id)
-    if existing is None or existing["provenance"] != "manual":
-        upsert_classification(job_id, classify_canonical_job(payload))
+        existing = conn.execute("SELECT * FROM job_classifications WHERE job_id=?", (job_id,)).fetchone()
+        if existing is None or existing["provenance"] != "manual":
+            merged = dict(conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone())
+            upsert_classification(job_id, classify_canonical_job(merged), connection=conn)
     return job_id
 
 
@@ -349,8 +353,11 @@ def get_classification(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM job_classifications WHERE job_id = ?", (job_id,))
 
 
-def upsert_classification(job_id: int, classification: Any, provenance: str = "deterministic") -> None:
-    with connect() as conn:
+def upsert_classification(job_id: int, classification: Any, provenance: str = "deterministic", *, connection: sqlite3.Connection | None = None) -> None:
+    with nullcontext(connection) if connection is not None else closing(connect()) as conn:
+        if connection is None:
+            with conn:
+                return upsert_classification(job_id, classification, provenance, connection=conn)
         conn.execute("""INSERT INTO job_classifications (job_id, primary_role_family, secondary_role_families_json, seniority, role_evidence_json, seniority_evidence_json, provenance, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET primary_role_family=excluded.primary_role_family, secondary_role_families_json=excluded.secondary_role_families_json, seniority=excluded.seniority, role_evidence_json=excluded.role_evidence_json, seniority_evidence_json=excluded.seniority_evidence_json, provenance=excluded.provenance, updated_at=excluded.updated_at""", (job_id, classification.primary_role_family, dump_json(list(classification.secondary_role_families)), classification.seniority, dump_json(list(classification.role_evidence)), dump_json(list(classification.seniority_evidence)), provenance, now_iso()))
 
 

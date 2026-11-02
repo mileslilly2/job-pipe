@@ -20,10 +20,11 @@ def fetch_lever_jobs(source: JobSource) -> list[DiscoveredJob]:
     for item in rows:
         categories = item.get("categories") or {}
         urls = item.get("urls") or {}
-        content = item.get("content") or {}
+        content = item.get("content") or item
         description = _build_description(content)
         location = str(categories.get("location") or _first_value(categories.get("allLocations")) or "")
-        remote = _is_remote(str(item.get("workplaceType") or ""), location, description)
+        workplace_type = str(item.get("workplaceType") or "")
+        remote = _is_remote(workplace_type, location, description)
         posted_at = _millis_to_iso(item.get("createdAt"))
         discovered.append(
             DiscoveredJob(
@@ -33,10 +34,12 @@ def fetch_lever_jobs(source: JobSource) -> list[DiscoveredJob]:
                 title=str(item.get("text") or ""),
                 location=location,
                 remote=remote,
-                apply_url=str(urls.get("apply") or ""),
+                apply_url=str(item.get("applyUrl") or urls.get("apply") or ""),
                 description=description,
                 posted_at=posted_at,
-                source_url=str(urls.get("show") or urls.get("list") or urls.get("apply") or ""),
+                source_url=str(item.get("hostedUrl") or urls.get("show") or urls.get("list") or item.get("applyUrl") or urls.get("apply") or ""),
+                remote_type=workplace_type,
+                employment_type=str(categories.get("commitment") or ""),
             )
         )
     return discovered
@@ -55,7 +58,7 @@ def _fetch_with_fallback(account: str) -> dict:
             return _fetch_json(url)
         except (URLError, ValueError, TimeoutError) as exc:
             last_error = exc
-    raise RuntimeError(f"Failed to fetch Lever account {account}") from last_error
+    raise RuntimeError(f"Failed to fetch Lever account {account}: {type(last_error).__name__}: {last_error}") from last_error
 
 
 def _fetch_json(url: str) -> dict:
@@ -66,7 +69,7 @@ def _fetch_json(url: str) -> dict:
 
 def _build_description(content: dict) -> str:
     parts: list[str] = []
-    description = str(content.get("description") or "").strip()
+    description = _strip_html(str(content.get("descriptionPlain") or content.get("description") or "")).strip()
     if description:
         parts.append(description)
     for item in content.get("lists") or []:
@@ -76,15 +79,16 @@ def _build_description(content: dict) -> str:
             parts.append(heading)
         if body:
             parts.append(body)
-    closing = str(content.get("closing") or "").strip()
+    closing = _strip_html(str(content.get("additionalPlain") or content.get("additional") or content.get("closing") or "")).strip()
     if closing:
         parts.append(closing)
-    return " ".join(part for part in parts if part)
+    return "\n".join(part for part in parts if part)
 
 
 def _strip_html(value: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", value)
-    return " ".join(text.split())
+    text = re.sub(r"</?(?:p|div|li|h[1-6]|ul|ol)\b[^>]*>|<br\s*/?>", "\n", value, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return "\n".join(" ".join(line.split()) for line in text.splitlines() if line.strip())
 
 
 def _first_value(value) -> str:

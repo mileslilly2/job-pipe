@@ -1,6 +1,6 @@
-# Job-Pipe agent interface (v0.2.0)
+# Job-Pipe agent interface (v0.3.0)
 
-Job-Pipe provides nine local MCP tools over stdio. An agent discovers tools and
+Job-Pipe provides fourteen local MCP tools over stdio. An agent discovers tools and
 exchanges structured data without reading Python source, issuing SQL, or parsing
 terminal tables. Job-Pipe supplies tools; it does not run an LLM.
 
@@ -20,12 +20,24 @@ The default mode is **read-only**. To authorize the two bounded local writes:
 ./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-local-writes
 ```
 
+Discovery has separate permissions. None of these flags implies another:
+
+```fish
+./venv/bin/python -m jobpipe.mcp_server --workspace /home/miles/Documents/job-pipe --enable-source-trials --enable-ingest --enable-local-writes
+```
+
+`--enable-source-trials` permits network trials of configured/catalog sources.
+`--enable-ingest` permits ingestion from enabled configured sources, including
+normal database upserts and source-run measurements. `--enable-local-writes`
+still grants only saving and preparation. No flag grants source changes,
+applicant/profile edits, submission, shell, SQL, arbitrary paths or arbitrary HTTP.
+
 The workspace defaults to the startup working directory. An explicit workspace
 must exist. It selects the existing `jobpipe.db`, `data/` configuration,
 `profile.md`, and `applications/` directory together. There is no independent
 database path override or tool-supplied destination path.
 
-Startup, initialization, and discovery need no network or database. Database
+Server startup, protocol initialization, and tool discovery need no network or database. Database
 tools report missing or incompatible databases without creating/migrating them.
 Run `jobpipe init` yourself from the selected workspace when initialization or
 migration is necessary. `get_active_goal` reads configuration and works without a
@@ -45,8 +57,9 @@ existing SQLite, classification, fit scoring, source metrics, package renderer
 review saves, and preparation orchestration. CLI and web delegate to it. The MCP
 adapter uses the official SDK's supported `Server` and stdio transport, with a
 fixed tool registry, Pydantic validation, and centralized capability checks.
-There is no custom MCP framing, second classifier, scoring formula, eligibility
-policy, source-yield algorithm, or discovery index.
+There is no custom MCP framing, second classifier, scoring formula,
+source-yield algorithm, or discovery index. Eligibility is a separate shared,
+deterministic Python service; it never rewrites canonical fit scores.
 
 ## Tools and schemas
 
@@ -68,6 +81,94 @@ return `items`, `total`, `limit`, `offset`, and nullable `next_offset`.
 | `get_followups` | `due_only` (default false) | Applied application records with job title/company, follow-up timestamp and `due` boolean |
 | `save_job` | `job_id` | Review/application/display statuses, workflow bucket, `changed` boolean |
 | `prepare_application` | `job_id` | Statuses, package directory, résumé/cover-note/fit-analysis/instruction paths, validation concerns, `reused` boolean |
+| `ingest_sources` | Optional configured `source_ids` (1–20), named search `profile`, `diagnostics` | Run ID, selected sources, deadline and polling instruction |
+| `trial_source` | Known `source_id`, optional `diagnostics` | Fetch/filter counts, unchanged discovery yield, role/seniority distributions, rejection reasons, eligibility counts and up to five passing examples |
+| `get_discovery_status` | Optional `run_id` | Latest completed measurement timestamp, running operations, selected run/source outcomes, aggregate counts, current corpus concentration and stale warnings |
+| `get_job_eligibility` | `job_id`, optional registered `applicant_profile` name | Canonical technical-fit score and independent eligibility assessment |
+| `search_eligible_jobs` | Optional `query`, canonical `role_family`, `remote_preference` (`remote_us`, `remote`, `any`), `minimum_fit_score`, `eligibility_status`, pagination | Canonical summaries with eligibility and resolved goal |
+
+### Discovery runs and trials
+
+`ingest_sources` returns promptly after reserving the workspace ingest lock.
+Poll `get_discovery_status({"run_id": ...})` until `run.status` is `completed` or
+`aborted`; only then interpret its final counts or search newly discovered jobs.
+At most 20 configured sources run per request, under a 180-second hard worker
+deadline and existing 15-second provider request timeouts. Larger workspaces
+must be refreshed in explicit source batches. Concurrent CLI/MCP ingests fail
+with `operation_in_progress`. Completed source transactions survive interruption;
+the unfinished source transaction rolls back. Shutdown terminates owned workers.
+
+Progress reuses existing ingest/source-run tables. `pending` and `running` source
+rows have unavailable counts until finished. The latest completed-run view and
+current canonical corpus remain separate. Seven-day stale warnings refer to
+source measurements, not proof that individual postings have closed.
+
+Trials have a 30-second hard deadline. They use the real adapters and discovery
+evaluator without database, feedback, metrics, configuration or file writes.
+Explicitly selecting a disabled source enables it only in memory for that trial.
+Configured definitions take precedence; catalog-only entries use the first
+alphabetically named pack, disclosed in the result. Arbitrary URLs and invented
+source identifiers are rejected. A trial also works without a database.
+
+`diagnostics` is reserved for requesting diagnostic context; aggregate rejection
+reasons and distributions are always returned. Reasons can overlap. Distribution
+denominators are explicit in trial responses. Eligibility counts use **passed
+discovery** as their denominator, never all fetched postings. Missing/failed
+measurements are null. A successful empty response is not evidence of a healthy,
+current employer board without independent careers-page verification.
+
+### Eligibility and applicant facts
+
+Eligibility is `eligible`, `ineligible`, or `needs_review`, independently of fit.
+Each check returns its status, evidence and concerns. Assessments also identify
+missing applicant/employer information and a recommended next action. A proved
+mandatory conflict dominates unresolved checks. Otherwise unresolved applicable
+constraints require review. Eligibility covers stated constraints; it does not
+certify availability, completeness of employer policy, or likelihood of hiring.
+
+Remote-US eligibility requires explicit posting hiring scope and verified
+residence/authorization. State-restricted, onsite/hybrid, international and
+ambiguous postings retain distinct assessments. Incidental remote mentions do
+not establish US eligibility. Foreign authorization and relocation are never
+inferred from US citizenship. Preferred experience is not mandatory; projects
+are not professional employment. Experience ranges retain both bounds, including
+the uncertain upper bound in `2–12+ years`. Explicit future-role and talent-pool titles
+require employer review before readiness is asserted.
+
+The default applicant is `data/profiles/candidate.yaml`. Optional applicant names
+resolve existing files in that directory; paths and symlinks are rejected.
+Legacy files remain valid, with missing facts unknown. An optional `eligibility`
+mapping supports country-specific `work_authorizations`, `citizenship_countries`,
+`residence_country`, `residence_state`, `commute_locations`,
+`professional_experience_years`, `experience_by_area`, enrollment/graduation,
+employment restrictions, languages, `native_languages` and credentials. Facts use explicit provenance:
+
+```yaml
+eligibility:
+  residence_country:
+    value: US
+    verified: true
+    evidence: "Applicant confirmation with date; populate only when actually confirmed."
+  work_authorizations:
+    - country: US
+      authorized: true
+      sponsorship_required: false
+      verified: true
+      evidence: "Applicant confirmation with date; this is an example, not a seeded fact."
+```
+
+Only facts marked verified are used. Unknown fields should be omitted, not filled
+with zero or false. Packaged templates contain no private applicant facts. The
+workspace records only facts the user confirmed during planning; residence,
+experience and enrollment remain unresolved. Neither MCP discovery flag can
+write applicant facts. An assessment using another profile cannot bypass the
+preparation gate, which always rechecks the active persisted applicant.
+
+Eligibility search defaults to confirmed eligible jobs. Request `needs_review`
+explicitly to inspect uncertainties, or `all` to compare categories. Evaluation
+and eligibility filtering occur before pagination. Category ordering is eligible,
+needs-review, ineligible; score/time/ID ordering within each category remains
+canonical. The broader `search_jobs` tool remains available for investigation.
 
 Job summaries contain `job_id`, `title`, `company`, `location`, boolean `remote`,
 nullable primary role family and seniority, `fit_score`, `status`,
@@ -108,10 +209,16 @@ Running/aborted measurements are excluded. CLI history reporting remains availab
 
 ## Permissions and write behavior
 
-All nine tools remain discoverable in both modes. Read-only mode rejects both
-write operations with `permission_denied` before database access. Tool arguments
+All fourteen tools remain discoverable in every mode. Read-only mode rejects
+network trials, ingestion and local writes with `permission_denied` before
+database/network access. Tool arguments
 cannot grant capabilities. `--enable-local-writes` authorizes only saving an
 existing review record and preparing its local application bundle.
+
+MCP preparation additionally requires current confirmed eligibility; ineligible
+and needs-review jobs return `eligibility_unresolved`, including on bundle reuse.
+Saving remains available for investigation. Manual CLI/web preparation retains
+existing transitions and returns eligibility concerns without asserting readiness.
 
 Save is idempotent: an already-saved review record receives no additional
 feedback or timestamp changes. Independent applied/interview/offer statuses are
@@ -146,10 +253,14 @@ addressed to an assistant. No text from a posting becomes executable code.
 Errors carry an actionable message and one of `invalid_arguments`, `unknown_job`,
 `missing_database`, `invalid_database`, `configuration_error`,
 `invalid_state_transition`, `permission_denied`,
-`application_preparation_failure`, or `internal_error`. Tool failures set MCP's
+`application_preparation_failure`, `eligibility_unresolved`, `unknown_source`,
+`unknown_run`, `operation_in_progress`, `operation_timeout`, or `internal_error`. Tool failures set MCP's
 `isError` flag. Normal responses contain no traceback; diagnostic exceptions are
 logged to stderr. Stdout is reserved for MCP. EOF and interruption shut down the
-server without starting background services.
+server and terminate its owned discovery workers. Hard worker deadlines also
+bound an orphan after abrupt parent death. An abandoned run is reconciled on the
+next authorized ingestion while holding the workspace lock; reads never repair
+or mutate run history.
 
 ## Connect a client
 
@@ -209,11 +320,39 @@ ignored by Git. Separate raw-stdio coverage checks protocol-only stdout and EOF.
 
 ## Current limitations
 
-Only the nine tools above are exposed. Agents operate on existing canonical jobs;
-ingest, source trials, goal edits, arbitrary status updates, and external
-submission remain human-interface operations. Search evaluates the local corpus
+Agents can discover, evaluate, save and prepare through the fourteen tools above.
+Source configuration, applicant facts, goal edits, arbitrary status updates and
+external submission remain outside MCP. Search evaluates the local corpus
 in memory; it adds no index. There is no hosted endpoint or authentication layer:
 the local client controls the launched process and startup permission flag.
 Existing bundle edits are protected by reuse, not automatically merged or
 regenerated. Cross-resource failures after filesystem publication can leave a
 complete bundle whose feedback is recorded on a successful retry.
+
+## Recommended agent workflow
+
+1. Read `get_active_goal` and `get_discovery_status`.
+2. Trial known prospective sources if trial capability is enabled.
+3. Start `ingest_sources`; poll its run to completion and disclose failures.
+4. Search confirmed eligible jobs using the existing canonical fit scores.
+5. Inspect `get_job_eligibility`, `get_job`, and `get_fit_breakdown` for candidates.
+6. Save and prepare up to five strong eligible jobs. Re-read returned statuses
+   and paths; preparation is never submission.
+7. Report actual counts, posting freshness and unresolved evidence. Do not fill
+   a target with unsuitable jobs. Inspect needs-review jobs separately.
+
+Example instruction:
+
+> Use Job-Pipe to refresh available jobs, identify the strongest eligible remote-US opportunities, and prepare up to five applications. Use Job-Pipe MCP tools exclusively. Do not modify application policy, source configuration, or repository files. Do not submit applications. Report any eligibility uncertainties.
+
+New regression coverage in `tests/test_agent_discovery.py` launches real stdio
+servers and their workers in disposable workspaces. Only provider HTTP transport
+is mocked through a test-process import; production has no fixture or arbitrary
+endpoint flag. Five synthetic eligible packages validate mechanics and are
+reported separately from live opportunity counts.
+
+The dated live-source investigation, two-source opt-in proposal, and separate
+disabled research catalog are linked from [source health](source-health.md).
+Public measurements for the separately labeled cohorts are in
+[source-discovery-v0.3.0.json](source-discovery-v0.3.0.json); synthetic acceptance
+results remain separate from live opportunity counts.

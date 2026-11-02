@@ -1,6 +1,7 @@
 # Local runtime state
 jobpipe.db
 *.db-journal
+data/.discovery.lock
 .pytest_cache/
 diagnostics/
 __pycache__/

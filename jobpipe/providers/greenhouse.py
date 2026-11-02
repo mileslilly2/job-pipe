@@ -18,7 +18,7 @@ def fetch_greenhouse_jobs(source: JobSource) -> list[DiscoveredJob]:
     try:
         payload = _fetch_json(url)
     except (URLError, ValueError, TimeoutError) as exc:
-        raise RuntimeError(f"Failed to fetch Greenhouse board {source.board_token}") from exc
+        raise RuntimeError(f"Failed to fetch Greenhouse board {board_token}: {type(exc).__name__}: {exc}") from exc
     jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
     company = source.company or board_token
     discovered: list[DiscoveredJob] = []
@@ -58,8 +58,9 @@ def _clean_text(value: str) -> str:
     text = html.unescape(value)
     text = re.sub(r"<script.*?</script>", " ", text, flags=re.I | re.S)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"</?(?:p|div|li|h[1-6]|ul|ol)\b[^>]*>|<br\s*/?>", "\n", text, flags=re.I)
     text = re.sub(r"<[^>]+>", " ", text)
-    return " ".join(text.split())
+    return "\n".join(" ".join(line.split()) for line in text.splitlines() if line.strip())
 
 
 def _is_remote(location: str, description: str) -> bool:

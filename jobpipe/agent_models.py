@@ -7,6 +7,7 @@ from typing import Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .classification import CANONICAL_ROLE_FAMILIES
+from .eligibility import Assessment, EligibilityStatus
 
 T = TypeVar("T")
 Status = Literal["new", "saved", "packaged", "assessment", "analyzed", "ready_to_apply", "applied", "rejected", "interview", "offer", "ignored", "archived", "skipped"]
@@ -19,6 +20,21 @@ class Input(BaseModel):
 
 class EmptyInput(Input):
     pass
+
+
+class IngestInput(Input):
+    source_ids: list[str] | None = Field(default=None, min_length=1, max_length=20)
+    profile: str | None = Field(default=None, max_length=80)
+    diagnostics: bool = False
+
+
+class TrialInput(Input):
+    source_id: str = Field(min_length=1, max_length=500)
+    diagnostics: bool = False
+
+
+class DiscoveryStatusInput(Input):
+    run_id: int | None = Field(default=None, gt=0)
 
 
 class Pagination(Input):
@@ -45,6 +61,18 @@ class SearchInput(Pagination):
     active_only: bool = True
 
 
+class EligibilityInput(JobInput):
+    applicant_profile: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
+
+
+class EligibleSearchInput(Pagination):
+    query: str | None = Field(default=None, max_length=1000)
+    role_family: Literal[*CANONICAL_ROLE_FAMILIES] | None = None
+    remote_preference: Literal["remote_us", "remote", "any"] | None = None
+    minimum_fit_score: int = Field(default=0, ge=0, le=100)
+    eligibility_status: Literal["eligible", "needs_review", "ineligible", "all"] = "eligible"
+
+
 class ApplicationsInput(Pagination):
     status: ApplicationStatus | None = None
     company: str | None = Field(default=None, max_length=500)
@@ -68,7 +96,7 @@ class SourceYieldInput(Pagination):
 
 
 class AgentError(BaseModel):
-    code: Literal["invalid_arguments", "unknown_job", "missing_database", "invalid_database", "configuration_error", "invalid_state_transition", "permission_denied", "application_preparation_failure", "internal_error"]
+    code: Literal["invalid_arguments", "unknown_job", "missing_database", "invalid_database", "configuration_error", "invalid_state_transition", "permission_denied", "application_preparation_failure", "internal_error", "eligibility_unresolved", "unknown_source", "unknown_run", "operation_in_progress", "operation_timeout"]
     message: str
 
 
@@ -124,6 +152,119 @@ class SearchResult(Page[JobSummary]):
     goal: str | None
 
 
+class EligibleJobSummary(JobSummary):
+    eligibility: Assessment
+
+
+class EligibleSearchResult(Page[EligibleJobSummary]):
+    goal: str | None
+
+
+class JobEligibility(BaseModel):
+    job_id: int
+    technical_fit_score: int
+    applicant_profile: str
+    eligibility: Assessment
+
+
+class IngestStarted(BaseModel):
+    run_id: int
+    status: Literal["running"]
+    selected_sources: list[str]
+    timeout_seconds: int
+    next_action: str
+
+
+class TrialJob(BaseModel):
+    external_id: str
+    title: str
+    company: str
+    location: str
+    application_url: str
+    eligibility: Assessment
+
+
+class TrialResult(BaseModel):
+    source_id: str
+    configuration_origin: str
+    profile: str
+    goal: str | None
+    status: Literal["success", "failed"]
+    error: str | None
+    fetched: int | None
+    passed: int | None
+    rejected: int | None
+    yield_rate: float | None
+    distribution_denominators: dict[str, str]
+    role_family_distribution: dict[str, int]
+    distribution_denominators: dict[str, str]
+    seniority_distribution: dict[str, int]
+    rejection_reasons: dict[str, int]
+    eligibility_denominator: int | None
+    eligibility_counts: dict[EligibilityStatus, int | None]
+    representative_jobs: list[TrialJob]
+
+
+class DiscoveryRun(BaseModel):
+    id: int
+    started_at: str
+    completed_at: str | None
+    profile: str
+    goal: str | None
+    status: str
+    error: str | None
+
+
+class CurrentOperation(BaseModel):
+    run_id: int
+    started_at: str
+
+
+class DiscoverySourceResult(BaseModel):
+    source_id: str
+    fetch_status: str
+    error: str | None
+    fetched: int | None
+    passed: int | None
+    rejected: int | None
+    inserted: int
+    updated: int
+
+
+class EmployerShare(BaseModel):
+    company: str
+    active_jobs: int
+    share: float | None
+
+
+class Concentration(BaseModel):
+    active_jobs: int
+    employers: int
+    sources: int
+    largest_employer_share: float | None
+    warning: bool
+    top_employers: list[EmployerShare]
+
+
+class DiscoveryStatus(BaseModel):
+    latest_ingest_timestamp: str | None
+    enabled_sources: list[str]
+    current_operations: list[CurrentOperation]
+    run: DiscoveryRun | None
+    sources_checked: int
+    successful_sources: int
+    failed_sources: int
+    fetched: int | None
+    passed: int | None
+    inserted: int | None
+    updated: int | None
+    yield_rate: float | None
+    measurement_scope: str
+    source_results: list[DiscoverySourceResult]
+    current_corpus: Concentration
+    stale_source_warnings: list[str]
+
+
 class Classification(BaseModel):
     primary_role_family: str
     secondary_role_families: list[str]
@@ -139,6 +280,7 @@ class Requirements(BaseModel):
     responsibilities: list[str]
     seniority: str
     concerns: list[str]
+    experience: list[dict] = Field(default_factory=list)
 
 
 class Application(BaseModel):

@@ -316,8 +316,16 @@ def evaluate_discovered_job(
     """Evaluate every current filter rule and return deterministic reason codes."""
     active_profile = profile or load_search_profile()
     include = include_keywords if include_keywords is not None else _explicit_keywords(source.include_keywords)
-    exclude = exclude_keywords if exclude_keywords is not None else _effective_keywords(source.exclude_keywords, DEFAULT_EXCLUDE_KEYWORDS)
     targets = target_role_families if target_role_families is not None else _effective_role_families(source.target_role_families, active_profile.preferred + active_profile.acceptable)
+    exclude = exclude_keywords if exclude_keywords is not None else _effective_keywords(source.exclude_keywords, DEFAULT_EXCLUDE_KEYWORDS)
+    # Only implicit defaults yield to explicit positive role intent. User/source
+    # keyword exclusions remain authoritative, including in filter_discovered_jobs.
+    support_terms = {"help_desk": {"help desk", "helpdesk", "service desk"},
+                     "technical_support": {"technical support", "it support", "desktop support", "support engineer"}}
+    if not _explicit_keywords(source.exclude_keywords):
+        allowed_roles = set(targets) & set(active_profile.preferred + active_profile.acceptable)
+        exceptions = set().union(*(terms for role, terms in support_terms.items() if role in allowed_roles))
+        exclude = [term for term in exclude if term not in exceptions]
     positive = profile_keywords if profile_keywords is not None else _explicit_keywords(active_profile.positive_keywords)
     negative = profile_negative_keywords if profile_negative_keywords is not None else _explicit_keywords(active_profile.negative_keywords)
     family, _matched, _reason = classify_role_family(job)

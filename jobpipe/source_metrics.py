@@ -7,7 +7,7 @@ Neither rate is a historical conversion rate or a source score.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from contextlib import closing
+from contextlib import closing, nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 import sqlite3
@@ -40,14 +40,19 @@ def start_ingest_run(profile: SearchProfile) -> int:
         return int(cursor.lastrowid)
 
 
-def record_source_run(run_id: int, report: SourceDiscoveryReport, *, inserted: int = 0, updated: int = 0) -> None:
-    with connect() as conn:
+def record_source_run(run_id: int, report: SourceDiscoveryReport, *, inserted: int = 0, updated: int = 0, connection: sqlite3.Connection | None = None) -> None:
+    with nullcontext(connection) if connection is not None else closing(connect()) as conn:
+        if connection is None:
+            with conn:
+                return record_source_run(run_id, report, inserted=inserted, updated=updated, connection=conn)
         conn.execute(
             """INSERT INTO source_run_stats
             (run_id, source_id, provider, company, source_json, fetch_status, error,
              fetched, passed, rejected, inserted, updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, source_id) DO UPDATE SET
+                fetch_status = excluded.fetch_status, error = excluded.error,
+                fetched = excluded.fetched, passed = excluded.passed, rejected = excluded.rejected,
                 inserted = excluded.inserted, updated = excluded.updated""",
             (run_id, report.label, report.source.provider, report.source.company,
              dump_json(report.source.model_dump()), report.status, report.error,
@@ -139,6 +144,17 @@ def build_source_metrics(sources: list[JobSource], *, path: Path | None = None) 
 
 def completed_runs(report: SourceMetrics) -> list[dict[str, Any]]:
     return [run for run in report.runs if run["status"] == "completed" and run["completed_at"]]
+
+
+def concentration(report: SourceMetrics) -> dict[str, Any]:
+    """The same active-corpus employer calculation used by CLI and MCP."""
+    total = report.active_count
+    ranked = sorted(report.employers.items(), key=lambda item: (-item[1], item[0]))
+    largest = rate(ranked[0][1], total) if ranked else None
+    return {"active_jobs": total, "employers": len(ranked),
+            "sources": len(report.active_sources), "largest_employer_share": largest,
+            "warning": bool(largest is not None and largest > 0.25),
+            "top_employers": [{"company": name, "active_jobs": count, "share": rate(count, total)} for name, count in ranked[:5]]}
 
 
 def run_stats(report: SourceMetrics, run_id: int) -> dict[str, dict[str, Any]]:

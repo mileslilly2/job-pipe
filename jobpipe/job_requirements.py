@@ -7,6 +7,7 @@ from typing import Any
 from .facts import classify_seniority, extract_job_facts
 from .score import score_risk
 from .utils import normalize_text
+from .experience import experience_dicts
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class JobRequirements:
     responsibilities: list[str] = field(default_factory=list)
     seniority: str = 'unknown'
     concerns: list[str] = field(default_factory=list)
+    experience: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,12 @@ def extract_job_requirements(job: Any) -> JobRequirements:
     required_skills = _dedupe(_merge_lists(_find_section_items(lines, 'required') + _skill_hits(text, preferred=False)))
     preferred_skills = _dedupe(_merge_lists(_find_section_items(lines, 'preferred') + _skill_hits(text, preferred=True)))
     responsibilities = _dedupe(_extract_responsibilities(lines, text))
-    seniority, seniority_notes = classify_seniority(job, experience_min_years=extract_job_facts(job).experience_min_years)
+    facts = extract_job_facts(job)
+    seniority, seniority_notes = classify_seniority(job, experience_min_years=facts.experience_min_years)
+    if isinstance(job, dict):
+        canonical = job.get('canonical_seniority')
+        if canonical and canonical != 'unknown':
+            seniority, seniority_notes = canonical, ['persisted canonical seniority']
     concerns = _build_concerns(job, text, responsibilities, seniority, seniority_notes)
     return JobRequirements(
         required_skills=required_skills,
@@ -49,6 +56,7 @@ def extract_job_requirements(job: Any) -> JobRequirements:
         responsibilities=responsibilities,
         seniority=seniority,
         concerns=concerns,
+        experience=experience_dicts(text),
     )
 
 
@@ -207,7 +215,7 @@ def _build_concerns(job: Any, text: str, responsibilities: list[str], seniority:
         concerns.append('Responsibilities are not explicit.')
     if not getattr(job, 'company', ''):
         concerns.append('Company name is missing.')
-    risk_score, flags = score_risk(job if not isinstance(job, dict) else SimpleNamespace(**job), None)
+    risk_score, flags = score_risk(job if not isinstance(job, dict) else SimpleNamespace(**{"source_url": None, **job}), None)
     if flags:
         concerns.append('Risk signals: ' + ', '.join(flags[:4]))
     if risk_score >= 25 and not flags:
@@ -358,4 +366,4 @@ def _job_text(job: Any) -> str:
         if value is None and isinstance(job, dict):
             value = job.get(attr)
         values.append(str(value or ''))
-    return ' '.join(values)
+    return '\n'.join(values)

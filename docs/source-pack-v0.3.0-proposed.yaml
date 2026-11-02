@@ -1,0 +1,102 @@
+# Standalone proposals only; canonical source catalogs and enabled sources remain unchanged.
+# agent_discovery_v030: measured Canonical/RWS candidates, still unresolved eligibility.
+# Research pack: five additional verified feeds without current confirmed eligible opportunities.
+# Every entry is disabled on import.
+agent_discovery_v030_research:
+- board_token: customerio
+  company: Customer.io
+  company_slug: customerio
+  enabled: false
+  provider: greenhouse
+  target_role_families:
+  - backend_api
+  - python_automation
+  - data_engineer
+  - qa_automation
+  - ai_evaluation
+  - technical_support
+  - help_desk
+  - junior_software_engineer
+  - software_engineer
+  - technical_operations
+- board_token: grafanalabs
+  company: Grafana Labs
+  company_slug: grafanalabs
+  enabled: false
+  provider: greenhouse
+  target_role_families:
+  - backend_api
+  - python_automation
+  - data_engineer
+  - qa_automation
+  - ai_evaluation
+  - technical_support
+  - help_desk
+  - junior_software_engineer
+  - software_engineer
+  - technical_operations
+- board_token: launchdarkly
+  company: LaunchDarkly
+  company_slug: launchdarkly
+  enabled: false
+  provider: greenhouse
+  target_role_families:
+  - backend_api
+  - python_automation
+  - data_engineer
+  - qa_automation
+  - ai_evaluation
+  - technical_support
+  - help_desk
+  - junior_software_engineer
+  - software_engineer
+  - technical_operations
+- board_token: testlio
+  company: Testlio
+  company_slug: testlio
+  enabled: false
+  provider: greenhouse
+  target_role_families:
+  - backend_api
+  - python_automation
+  - data_engineer
+  - qa_automation
+  - ai_evaluation
+  - technical_support
+  - help_desk
+  - junior_software_engineer
+  - software_engineer
+  - technical_operations
+- board_token: invisibletech
+  company: Invisible Technologies
+  company_slug: invisibletech
+  enabled: false
+  provider: greenhouse
+  target_role_families:
+  - backend_api
+  - python_automation
+  - data_engineer
+  - qa_automation
+  - ai_evaluation
+  - technical_support
+  - help_desk
+  - junior_software_engineer
+  - software_engineer
+  - technical_operations
+agent_discovery_v030:
+- provider: greenhouse
+  company: Canonical
+  company_slug: canonical
+  board_token: canonical
+  target_role_families: []
+  include_keywords: []
+  exclude_keywords: []
+  enabled: false
+- provider: lever
+  company: RWS TrainAI
+  company_slug: rws
+  account: rws
+  target_role_families: []
+  include_keywords: []
+  exclude_keywords: []
+  enabled: false

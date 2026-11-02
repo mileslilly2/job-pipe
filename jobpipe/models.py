@@ -62,6 +62,7 @@ class CandidateProfile(BaseModel):
     experience: list[ExperienceItem] = Field(default_factory=list)
     education: list[EducationItem] = Field(default_factory=list)
     constraints: dict[str, list[str]] = Field(default_factory=dict)
+    eligibility: dict[str, Any] = Field(default_factory=dict)
 
 
 class RolePack(BaseModel):
@@ -171,6 +172,8 @@ class DiscoveredJob(BaseModel):
     description: str = ""
     posted_at: str | None = None
     source_url: str | None = None
+    remote_type: str = ""
+    employment_type: str = ""
 
 
 class JobAnalysis(BaseModel):
