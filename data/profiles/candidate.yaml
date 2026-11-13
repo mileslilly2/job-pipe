@@ -133,3 +133,17 @@ constraints:
     - unpaid
     - requires buying equipment
     - door to door sales
+
+# Confirmed by the user during v0.3.0 planning, 2026-10-29.
+# Residence, experience, and enrollment remain unknown.
+eligibility:
+  citizenship_countries:
+    value: [US]
+    verified: true
+    evidence: "User confirmed US citizenship during v0.3.0 planning on 2026-10-29."
+  work_authorizations:
+    - country: US
+      authorized: true
+      sponsorship_required: false
+      verified: true
+      evidence: "User confirmed US citizenship and no need for US visa sponsorship during v0.3.0 planning on 2026-10-29."

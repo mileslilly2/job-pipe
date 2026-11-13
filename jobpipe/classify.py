@@ -50,7 +50,7 @@ def classify_job(job: ParsedJob, role_packs: dict[str, RolePack]) -> tuple[str, 
 
 def detect_seniority(job: ParsedJob, risk_score: int = 0, risk_flags: list[str] | None = None) -> tuple[str, list[str]]:
     title = (job.title or "").lower()
-    body = f"{job.title} {job.description}".lower()
+    body = f"{job.title} {job.description} {getattr(job, 'employment_type', '')}".lower()
     flags: list[str] = []
 
     if _has_any(title, ["director", "head of"]):
@@ -59,13 +59,20 @@ def detect_seniority(job: ParsedJob, risk_score: int = 0, risk_flags: list[str] 
         return "manager", ["title indicates manager-level role"]
     if _has_any(title, ["senior", "sr."]):
         return "senior", ["title indicates senior-level role"]
+    if _has_any(title, ["contract", "contractor", "c2h", "freelance", "consultant"]):
+        return "contractor", ["title indicates contractor-level role"]
 
     if _has_any(title, ["junior", "jr."]):
         return "junior", ["title indicates junior-level role"]
     if _has_any(title, ["entry level", "entry-level"]):
         return "entry_level", ["title indicates entry-level role"]
+    if _has_any(title, ["apprentice", "apprenticeship", "apprentices", "trainee"]):
+        return "apprenticeship", ["title indicates apprenticeship-level role"]
     if any(pattern in title for pattern in [" analyst i", " specialist i", " technician i", " level 1", " tier 1"]):
         return "entry_level", ["title indicates entry-level role"]
+    import re
+    if re.search(r"\b(?:intern|internship|co-op)\b", title):
+        return "internship", ["title indicates internship-level role"]
 
     if _has_any(body, ["director", "head of"]):
         flags.append("description indicates director-level scope")
@@ -76,10 +83,17 @@ def detect_seniority(job: ParsedJob, risk_score: int = 0, risk_flags: list[str] 
     if _has_any(body, ["senior", "sr.", "3+ years", "5+ years", "7+ years", "enterprise experience", "administrator", "architect"]):
         flags.append("description indicates senior-level scope")
         return "senior", flags
+    if _has_any(body, ["contract", "contractor", "c2h", "freelance", "consultant"]):
+        flags.append("description indicates contractor-level scope")
+        return "contractor", flags
 
     if _has_any(body, ["junior", "entry level", "entry-level", "level 1", "tier 1", "technician i", "analyst i", "specialist i"]):
         flags.append("description indicates entry-level scope")
         return "entry_level", flags
+
+    if _has_any(body, ["apprentice", "apprenticeship", "apprentices", "trainee"]):
+        flags.append("description indicates apprenticeship-level scope")
+        return "apprenticeship", flags
 
     no_experience = "no experience required" in body or "no experience" in body
     risky_no_experience = no_experience and risk_score >= 75

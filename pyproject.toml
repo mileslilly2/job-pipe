@@ -4,21 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jobpipe"
-version = "0.1.0"
+version = "0.3.1"
 description = "Local-first CLI for repetitive job application preparation."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi>=0.115",
   "jinja2>=3.1",
   "pydantic>=2.7",
   "PyYAML>=6.0",
   "rich>=13.7",
   "typer>=0.12",
+  "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
+agent = ["mcp>=2.3,<3"]
 dev = [
+  "httpx>=0.27",
   "pytest>=8.2",
+  "mcp>=2.3,<3",
 ]
 
 [project.scripts]
@@ -34,9 +39,11 @@ include = ["jobpipe*"]
 jobpipe = [
   "profile.md",
   "data/*.yaml",
+  "data/knowledge.yaml",
   "data/profiles/*.yaml",
   "role_packs/*.yaml",
   "templates/*.j2",
+  "templates/web/*.html",
 ]
 
 [tool.pytest.ini_options]

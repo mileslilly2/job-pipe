@@ -1,0 +1,247 @@
+match_weights:
+  exact: 8
+  alias: 6
+  related: 3
+  conflict: -12
+  preferred_role_family: 4
+  preferred_concept: 2
+
+goals:
+  career_acceleration:
+    label: Career Acceleration
+    description: career acceleration
+    role_family_modifiers:
+      backend_api: 12
+      data_engineering: 12
+      python_automation: 10
+      software_engineering: 8
+      full_stack: 8
+      qa_automation: 8
+      ai_evaluation: 6
+      machine_learning: 8
+      ai_research: 8
+      data_analytics: 8
+      infrastructure: 5
+      security: 5
+      frontend: 4
+      help_desk: -8
+      technical_support: -5
+      legal: -8
+      sales: -8
+  maximize_income:
+    label: Maximize Income
+    description: maximizing income
+  get_employed_fast:
+    label: Get Employed Fast
+    description: rapid employment
+    role_family_modifiers:
+      help_desk: 10
+      technical_support: 9
+      qa_automation: 7
+      python_automation: 7
+      backend_api: 6
+      ai_evaluation: 6
+      full_stack: 5
+      data_engineering: 5
+      software_engineering: 4
+      frontend: 4
+      security: 3
+      infrastructure: 3
+      data_analytics: 3
+      machine_learning: 2
+      product: 2
+      ai_research: 1
+  remote_first:
+    label: Remote First
+    description: remote-first work
+  learn_new_skills:
+    label: Learn New Skills
+    description: learning new skills
+  stable_employment:
+    label: Stable Employment
+    description: stable employment
+  resume_building:
+    label: Resume Building
+    description: resume building
+
+concepts:
+  automation:
+    aliases:
+      - automation
+      - workflow automation
+      - internal tooling
+      - internal tools
+      - tooling
+    related:
+      - backend_api
+      - qa_automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - python_automation
+      - technical_operations
+  backend_api:
+    aliases:
+      - backend api
+      - backend engineer
+      - backend developer
+      - api
+      - microservices
+      - internal tooling
+      - internal tools
+    weights:
+      career_acceleration: 15
+      maximize_income: 12
+      get_employed_fast: 5
+    related:
+      - automation
+      - data_engineering
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - backend_api
+  data_engineering:
+    aliases:
+      - data engineering
+      - data pipeline
+      - data pipelines
+      - pipelines
+      - etl
+      - warehouse
+    related:
+      - backend_api
+      - automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - data_engineer
+  qa_automation:
+    aliases:
+      - qa automation
+      - test automation
+      - sdet
+      - playwright
+      - pytest
+    weights:
+      career_acceleration: 8
+      get_employed_fast: 7
+      learn_new_skills: 10
+      resume_building: 8
+    related:
+      - automation
+    conflicts:
+      - help_desk
+      - customer_support
+    role_families:
+      - qa_automation
+  ai_evaluation:
+    aliases:
+      - ai evaluation
+      - model evaluation
+      - evals
+      - evaluation engineer
+    weights:
+      resume_building: 12
+      get_employed_fast: 6
+    related:
+      - automation
+    role_families:
+      - ai_evaluation
+  help_desk:
+    aliases:
+      - help desk
+      - helpdesk
+      - service desk
+      - desk support
+    weights:
+      career_acceleration: -15
+      get_employed_fast: 10
+      stable_employment: 8
+    conflicts:
+      - automation
+      - backend_api
+      - data_engineering
+      - qa_automation
+      - ai_evaluation
+    role_families:
+      - help_desk
+  customer_support:
+    aliases:
+      - customer support
+      - customer success
+      - client support
+      - customer care
+    conflicts:
+      - automation
+      - backend_api
+      - data_engineering
+      - qa_automation
+      - ai_evaluation
+    role_families:
+      - customer_support
+  python:
+    aliases:
+      - python
+      - python scripting
+    related:
+      - automation
+      - backend_api
+      - data_engineering
+    role_families:
+      - python_automation
+      - backend_api
+      - data_engineer
+  sql:
+    aliases:
+      - sql
+    related:
+      - data_engineering
+    role_families:
+      - data_engineer
+  etl:
+    aliases:
+      - etl
+    related:
+      - data_engineering
+    role_families:
+      - data_engineer
+  cli:
+    aliases:
+      - cli
+      - command line
+      - command-line
+    related:
+      - automation
+    role_families:
+      - python_automation
+  debugging:
+    aliases:
+      - debugging
+      - troubleshooting
+    related:
+      - automation
+    role_families:
+      - python_automation
+  documentation:
+    aliases:
+      - documentation
+      - docs
+      - knowledge base
+    related:
+      - customer_support
+    role_families:
+      - technical_operations
+
+  remote:
+    role_families: []
+    weights:
+      remote_first: 12
+  salary_unknown:
+    role_families: []
+    weights:
+      maximize_income: -3
+
+profiles: {}

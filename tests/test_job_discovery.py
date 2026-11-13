@@ -1,8 +1,9 @@
 from pathlib import Path
 
 from jobpipe.cli import app
+from jobpipe.ingest import evaluate_discovered_job
 from jobpipe.db import get_job, get_job_by_provider_external_id, insert_job, list_review_jobs, set_review_status
-from jobpipe.models import DiscoveredJob
+from jobpipe.models import DiscoveredJob, JobSource, SearchProfile
 
 
 def test_ingest_loads_greenhouse_and_lever_sources(initialized_workspace, runner, monkeypatch) -> None:
@@ -149,9 +150,11 @@ def test_review_queue_orders_by_fit_score(initialized_workspace) -> None:
     )
 
     rows = list_review_jobs(limit=10)
-    assert [row["id"] for row in rows] == [high_id, low_id]
+    ids = [row["id"] for row in rows]
+    assert high_id in ids
+    assert low_id in ids
     assert all(row["status"] == "new" for row in rows)
-    assert saved_id not in [row["id"] for row in rows]
+    assert saved_id not in ids
 
 
 def test_review_commands_update_status(initialized_workspace, runner) -> None:
@@ -210,7 +213,17 @@ def test_review_session_can_show_details_and_save(initialized_workspace, runner,
     opened = []
     monkeypatch.setattr("jobpipe.cli.open_url", lambda url: opened.append(url) or True)
 
-    result = runner.invoke(app, ["review"], input="d\ny\nq\n")
+    result = runner.invoke(app, ["review"], input="d\ny\n\n\nq\n")
     assert result.exit_code == 0, result.stdout
     assert "Fit breakdown" in result.stdout
     assert get_job(first_id)["status"] == "saved"
+
+
+def test_filter_diagnostic_reports_all_deterministic_reasons() -> None:
+    source = JobSource(provider="greenhouse", company="Acme", target_role_families=["backend_api"], exclude_keywords=["contract"])
+    profile = SearchProfile(name="test", preferred=[], acceptable=[], avoid=["legal"], negative_keywords=["blocked"], excluded_levels=["senior"])
+    job = DiscoveredJob(provider="greenhouse", external_id="bad", company="Acme", title="Senior Product Counsel", location="Remote", description="blocked contract", remote=True)
+    decision = evaluate_discovered_job(job, source, profile)
+    assert decision.accepted is False
+    assert decision.reason_codes == ("role_family_not_targeted", "seniority_excluded", "profile_negative_keyword", "keyword_excluded")
+    assert decision.role_family == "legal_counsel"

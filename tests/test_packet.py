@@ -12,7 +12,7 @@ def test_packet_includes_recommendation_and_reason(initialized_workspace, runner
     assert runner.invoke(app, ["packet", "1"]).exit_code == 0
     text = Path("output/packets/1-help-desk-analyst-i-packet.md").read_text(encoding="utf-8")
     assert "Recommendation: Apply" in text
-    assert "Role family: helpdesk" in text
+    assert "Role family: help_desk" in text
     assert "Seniority: entry_level" in text
 
 

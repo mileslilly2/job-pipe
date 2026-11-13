@@ -3,11 +3,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import sqlite3
+from contextlib import closing, nullcontext
 from pathlib import Path
 from typing import Any
 
+from .catalog import load_search_profile
+from .classification import classify_job as classify_canonical_job
 from .score import score_job_fit_v1
 from .utils import db_path, dump_json, ensure_dir, now_iso
+from .applicant_schema import APPLICANT_SCHEMA
 
 
 SCHEMA = """
@@ -15,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     provider TEXT NOT NULL DEFAULT 'manual',
     external_id TEXT NOT NULL DEFAULT '',
+    source_id TEXT,
     source_url TEXT,
     title TEXT,
     company TEXT,
@@ -55,6 +60,18 @@ CREATE TABLE IF NOT EXISTS job_analysis (
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 
+CREATE TABLE IF NOT EXISTS job_classifications (
+    job_id INTEGER PRIMARY KEY,
+    primary_role_family TEXT NOT NULL,
+    secondary_role_families_json TEXT NOT NULL DEFAULT "[]",
+    seniority TEXT NOT NULL,
+    role_evidence_json TEXT NOT NULL DEFAULT "[]",
+    seniority_evidence_json TEXT NOT NULL DEFAULT "[]",
+    provenance TEXT NOT NULL DEFAULT "deterministic",
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+
 CREATE TABLE IF NOT EXISTS application_packets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL UNIQUE,
@@ -77,13 +94,58 @@ CREATE TABLE IF NOT EXISTS applications (
     updated_at TEXT NOT NULL,
     FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    reason_codes TEXT,
+    note TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(job_id) REFERENCES jobs(id)
+);
+
+CREATE TABLE IF NOT EXISTS ingest_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    profile TEXT NOT NULL,
+    goal TEXT,
+    profile_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'aborted')),
+    error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS source_run_stats (
+    run_id INTEGER NOT NULL REFERENCES ingest_runs(id),
+    source_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    company TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    fetch_status TEXT NOT NULL,
+    error TEXT,
+    fetched INTEGER NOT NULL CHECK(fetched >= 0),
+    passed INTEGER NOT NULL CHECK(passed >= 0),
+    rejected INTEGER NOT NULL CHECK(rejected >= 0),
+    inserted INTEGER NOT NULL CHECK(inserted >= 0),
+    updated INTEGER NOT NULL CHECK(updated >= 0),
+    PRIMARY KEY (run_id, source_id),
+    CHECK(fetched = passed + rejected)
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_runs_completed ON ingest_runs(status, completed_at, id);
+CREATE INDEX IF NOT EXISTS idx_source_run_stats_source ON source_run_stats(source_id, run_id);
 """
 
+SCHEMA += APPLICANT_SCHEMA
 
-def connect(path: Path | None = None) -> sqlite3.Connection:
+
+def connect(path: Path | None = None, *, mode: str = "rwc") -> sqlite3.Connection:
     actual = path or db_path()
-    ensure_dir(actual.parent)
-    conn = sqlite3.connect(actual)
+    if mode not in {"ro", "rw", "rwc"}:
+        raise ValueError("Unsupported SQLite access mode")
+    if mode == "rwc":
+        ensure_dir(actual.parent)
+    conn = sqlite3.connect(actual.resolve().as_uri() + f"?mode={mode}", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -95,6 +157,7 @@ def init_database(path: Path | None = None) -> None:
         _migrate_job_analysis(conn)
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_provider_external_id ON jobs(provider, external_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_review_queue ON jobs(status, fit_score DESC, discovered_at ASC, id ASC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source_id)")
 
 
 def _migrate_jobs(conn: sqlite3.Connection) -> None:
@@ -102,6 +165,7 @@ def _migrate_jobs(conn: sqlite3.Connection) -> None:
     additions = {
         "provider": "TEXT",
         "external_id": "TEXT",
+        "source_id": "TEXT",
         "remote": "INTEGER NOT NULL DEFAULT 0",
         "apply_url": "TEXT",
         "posted_at": "TEXT",
@@ -161,7 +225,7 @@ def _manual_external_id(data: dict[str, Any]) -> str:
     return f"manual:{digest}"
 
 
-def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
+def insert_job(data: dict[str, Any], review_status: str | None = None, *, connection: sqlite3.Connection | None = None) -> int:
     timestamp = now_iso()
     provider = str(data.get("provider") or "manual")
     external_id = str(data.get("external_id") or data.get("source_url") or _manual_external_id(data))
@@ -174,6 +238,7 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
     payload = {
         "provider": provider,
         "external_id": external_id,
+        "source_id": data.get("source_id"),
         "source_url": data.get("source_url", ""),
         "title": data.get("title", ""),
         "company": data.get("company", ""),
@@ -192,19 +257,23 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
         "created_at": timestamp,
         "updated_at": timestamp,
     }
-    with connect() as conn:
+    with nullcontext(connection) if connection is not None else closing(connect()) as conn:
+        if connection is None:
+            with conn:
+                return insert_job(data, review_status, connection=conn)
         cur = conn.execute(
             """
             INSERT INTO jobs (
-                provider, external_id, source_url, title, company, location, remote, apply_url,
+                provider, external_id, source_id, source_url, title, company, location, remote, apply_url,
                 posted_at, discovered_at, fit_score, status, remote_type, employment_type,
                 salary_text, description, raw_text, created_at, updated_at
             ) VALUES (
-                :provider, :external_id, :source_url, :title, :company, :location, :remote, :apply_url,
+                :provider, :external_id, :source_id, :source_url, :title, :company, :location, :remote, :apply_url,
                 :posted_at, :discovered_at, :fit_score, :status, :remote_type, :employment_type,
                 :salary_text, :description, :raw_text, :created_at, :updated_at
             )
             ON CONFLICT(provider, external_id) DO UPDATE SET
+                source_id = COALESCE(jobs.source_id, excluded.source_id),
                 source_url = CASE WHEN excluded.source_url = '' THEN jobs.source_url ELSE excluded.source_url END,
                 title = CASE WHEN excluded.title = '' THEN jobs.title ELSE excluded.title END,
                 company = CASE WHEN excluded.company = '' THEN jobs.company ELSE excluded.company END,
@@ -237,7 +306,11 @@ def insert_job(data: dict[str, Any], review_status: str | None = None) -> int:
             """,
             (job_id, timestamp, timestamp),
         )
-        return job_id
+        existing = conn.execute("SELECT * FROM job_classifications WHERE job_id=?", (job_id,)).fetchone()
+        if existing is None or existing["provenance"] != "manual":
+            merged = dict(conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone())
+            upsert_classification(job_id, classify_canonical_job(merged), connection=conn)
+    return job_id
 
 
 def update_job(job_id: int, data: dict[str, Any]) -> None:
@@ -258,12 +331,12 @@ def set_review_status(job_id: int, status: str) -> None:
 
 
 def fetch_one(query: str, params: tuple[Any, ...] = ()) -> sqlite3.Row | None:
-    with connect() as conn:
+    with closing(connect(mode="ro")) as conn:
         return conn.execute(query, params).fetchone()
 
 
 def fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[sqlite3.Row]:
-    with connect() as conn:
+    with closing(connect(mode="ro")) as conn:
         return conn.execute(query, params).fetchall()
 
 
@@ -277,6 +350,18 @@ def get_job_by_provider_external_id(provider: str, external_id: str) -> sqlite3.
 
 def get_analysis(job_id: int) -> sqlite3.Row | None:
     return fetch_one("SELECT * FROM job_analysis WHERE job_id = ?", (job_id,))
+
+
+def get_classification(job_id: int) -> sqlite3.Row | None:
+    return fetch_one("SELECT * FROM job_classifications WHERE job_id = ?", (job_id,))
+
+
+def upsert_classification(job_id: int, classification: Any, provenance: str = "deterministic", *, connection: sqlite3.Connection | None = None) -> None:
+    with nullcontext(connection) if connection is not None else closing(connect()) as conn:
+        if connection is None:
+            with conn:
+                return upsert_classification(job_id, classification, provenance, connection=conn)
+        conn.execute("""INSERT INTO job_classifications (job_id, primary_role_family, secondary_role_families_json, seniority, role_evidence_json, seniority_evidence_json, provenance, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET primary_role_family=excluded.primary_role_family, secondary_role_families_json=excluded.secondary_role_families_json, seniority=excluded.seniority, role_evidence_json=excluded.role_evidence_json, seniority_evidence_json=excluded.seniority_evidence_json, provenance=excluded.provenance, updated_at=excluded.updated_at""", (job_id, classification.primary_role_family, dump_json(list(classification.secondary_role_families)), classification.seniority, dump_json(list(classification.role_evidence)), dump_json(list(classification.seniority_evidence)), provenance, now_iso()))
 
 
 def get_application(job_id: int) -> sqlite3.Row | None:
@@ -387,21 +472,52 @@ def list_jobs() -> list[sqlite3.Row]:
     return fetch_all(
         """
         SELECT
-            jobs.id, jobs.provider, jobs.external_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
+            jobs.id, jobs.provider, jobs.external_id, jobs.source_id, jobs.title, jobs.company, jobs.source_url, jobs.apply_url,
             jobs.location, jobs.remote, jobs.posted_at, jobs.discovered_at, jobs.fit_score, jobs.description, jobs.raw_text,
             jobs.status AS review_status,
-            job_analysis.role_type, job_analysis.seniority_level, job_analysis.risk_score, job_analysis.quality_score,
+            job_classifications.primary_role_family AS role_type,
+            job_classifications.primary_role_family AS primary_role_family, job_classifications.secondary_role_families_json, job_classifications.seniority AS canonical_seniority,
+            job_classifications.seniority AS seniority_level, job_analysis.risk_score, job_analysis.quality_score,
             job_analysis.recommendation, job_analysis.skip_reason,
             applications.status, applications.followup_at
         FROM jobs
         LEFT JOIN job_analysis ON job_analysis.job_id = jobs.id
+        LEFT JOIN job_classifications ON job_classifications.job_id = jobs.id
         LEFT JOIN applications ON applications.job_id = jobs.id
         ORDER BY jobs.id ASC
         """
     )
 
 
+def insert_feedback(job_id: int, action: str, reason_codes: str | None = None, note: str | None = None) -> None:
+    timestamp = now_iso()
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO feedback (job_id, action, reason_codes, note, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (job_id, action, reason_codes, note, timestamp),
+        )
+
+
+def list_feedback_with_analysis() -> list[sqlite3.Row]:
+    return fetch_all(
+        """
+        SELECT
+            f.id, f.job_id, f.action, f.reason_codes, f.note, f.created_at,
+            ja.role_type, ja.matched_keywords_json
+        FROM feedback f
+        LEFT JOIN job_analysis ja ON f.job_id = ja.job_id
+        ORDER BY f.created_at ASC
+        """
+    )
+
+
 def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
+    from .learn import load_learned_weights
+    learned_weights = load_learned_weights()
+    active_profile = load_search_profile()
     rows = fetch_all(
         """
         SELECT
@@ -414,7 +530,7 @@ def list_review_jobs(limit: int | None = None) -> list[sqlite3.Row]:
     ranked = sorted(
         rows,
         key=lambda row: (
-            -score_job_fit_v1(dict(row))[0],
+            -score_job_fit_v1(dict(row), learned_weights=learned_weights, profile=active_profile)[0],
             str(row["discovered_at"] or ""),
             int(row["id"]),
         ),

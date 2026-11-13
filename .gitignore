@@ -1,0 +1,13 @@
+# Local runtime state
+jobpipe.db
+*.db-journal
+data/.discovery.lock
+.pytest_cache/
+diagnostics/
+__pycache__/
+*.py[cod]
+
+# Local virtual environments
+venv/
+.venv/
+

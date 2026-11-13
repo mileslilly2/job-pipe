@@ -1,10 +1,27 @@
-# jobpipe
+# Job Pipe
 
-`jobpipe` is a local-first CLI for repetitive job application prep. It stores job postings, ranks them with a deterministic fit score, and lets you review, save, package, or skip jobs without a web UI.
+Job Pipe is a local-first CLI and dashboard for repetitive job application prep. It keeps job data, fit scoring, tailored notes, and application status in a local workspace so you can review roles quickly without handing the workflow to a hosted service.
+
+## What Problem It Solves
+
+Job search workflows get noisy fast: postings arrive from multiple sources, the same role needs to be scored repeatedly, and application materials have to stay consistent with your real background. Job Pipe centralizes that work locally. It ingests jobs, scores fit deterministically, records decisions, generates tailored bundles, and tracks follow-up state so you can spend less time redoing the same preparation.
+
+## Current Features
+
+- Ingest jobs from Greenhouse and Lever public postings.
+- Maintain editable job-source, search-profile, and source-pack YAML files.
+- Score fit with a deterministic knowledge graph plus learned feedback weights.
+- Review jobs in the CLI or the local FastAPI dashboard.
+- Save, skip, package, and apply jobs with tracked follow-up dates.
+- Generate local application bundles under `applications/<company>-<title>-job-<id>/`.
+- Tailor resume bullets, cover notes, and short answers from the candidate profile.
+- Export tracker data to CSV and inspect analytics dashboards.
+- Copy generated text or open local folders and URLs when you want browser assistance.
 
 ## Requirements
 
 - Python 3.11+
+- Fish shell for the setup examples below
 
 ## Setup
 
@@ -15,75 +32,9 @@ pip install -e ".[dev]"
 jobpipe init
 ```
 
-## Supported Providers
+`jobpipe init` seeds the workspace with starter sources, candidate data, knowledge data, and the SQLite database. If you skip `init`, `jobpipe ingest` can still fall back to the packaged starter job sources when `data/job_sources.yaml` is missing or empty.
 
-`jobpipe init` seeds `data/job_sources.yaml` with starter Greenhouse and Lever sources. `jobpipe ingest` also falls back to the packaged starter list when `data/job_sources.yaml` is missing or set to `[]`, so you can ingest immediately and then customize the workspace file later.
-
-- Greenhouse public job board API
-- Lever postings API
-
-Minimal Greenhouse source:
-
-```yaml
-- provider: greenhouse
-  company: GitLab
-  company_slug: gitlab
-  board_token: gitlab
-  enabled: true
-```
-
-Minimal Lever source:
-
-```yaml
-- provider: lever
-  company: Mistral AI
-  company_slug: mistral
-  account: mistral
-  enabled: true
-```
-
-Role-targeted source config:
-
-```yaml
-- provider: greenhouse
-  company: Stripe
-  company_slug: stripe
-  board_token: stripe
-  target_role_families:
-    - data_engineer
-    - backend_api
-    - python_automation
-
-- provider: lever
-  company: Wellfound
-  company_slug: angellist
-  account: angellist
-  target_role_families:
-    - junior_software_engineer
-    - software_engineer
-```
-
-Optional per-source keyword overrides:
-
-```yaml
-include_keywords:
-  - data engineer
-  - backend api
-  - qa automation
-exclude_keywords:
-  - help desk
-  - customer support
-  - manager
-```
-
-Field notes:
-
-- `company_slug` is jobpipe's stable company identifier.
-- `board_token` is the Greenhouse public board slug when it differs from `company_slug`.
-- `account` is the Lever postings account slug when it differs from `company_slug`.
-- `target_role_families` filters the ingest stream before scoring so generic support or sales jobs do not reach the review queue.
-
-Source management:
+## Fish-Compatible Examples
 
 ```fish
 jobpipe sources list
@@ -93,79 +44,132 @@ jobpipe sources enable gitlab
 jobpipe sources test
 ```
 
-## Example Flow
-
 ```fish
-jobpipe init
 jobpipe ingest
 jobpipe review
 jobpipe batch-review
+jobpipe shortlist --min-fit 70 --max-risk 40
+jobpipe due
+```
+
+```fish
 jobpipe show 1
 jobpipe save 1
 jobpipe package 1
 jobpipe apply-flow 1
 jobpipe skip 2
-jobpipe analyze 3
-jobpipe packet 3
-jobpipe tailor 3
-jobpipe shortlist --min-fit 60 --max-risk 50
-jobpipe status 3 applied
-jobpipe due
+jobpipe status 1 applied --reason interesting_company
+```
+
+```fish
+jobpipe web --no-open
+jobpipe analytics
+jobpipe feedback-report
 jobpipe export
 ```
 
-## Review Workflow
+## Main CLI Workflows
 
-1. Run `jobpipe init` to seed the workspace with starter sources, or skip it and let `jobpipe ingest` use the packaged defaults when `data/job_sources.yaml` is missing or `[]`.
-2. Use `jobpipe sources list` to inspect the current source set, then add, enable, or disable entries as needed.
-3. Edit `data/job_sources.yaml` directly when you want to tune `target_role_families` or keyword overrides.
-4. Run `jobpipe ingest` to fetch jobs and score them locally.
-4. Run `jobpipe review` for quick single-job triage, or `jobpipe batch-review` to process the ranked queue in one session.
-5. Use the interactive actions in `batch-review`:
-   - `s` save only
-   - `p` save + package
-   - `a` save + package + apply-flow
-   - `k` skip
-   - `d` details
-   - `o` open URL
-   - `q` quit
-5. Use `jobpipe show <job-id>` for a full local detail view.
-6. Use `jobpipe package <job-id>` to generate a local application bundle under `applications/`.
-7. Use `jobpipe apply-flow <job-id>` to open the apply URL, review the generated files, and mark the job applied manually if you want.
+### 1. Set up the workspace
 
-## Commands
+- Run `jobpipe init` once in a fresh checkout.
+- Review `data/job_sources.yaml`, `data/search_profiles.yaml`, and `data/knowledge.yaml` if you want to tune the defaults.
+- Edit `data/profiles/candidate.yaml` and `profile.md` to match your current background.
 
-- `jobpipe init`
-- `jobpipe ingest`
-- `jobpipe review`
-- `jobpipe batch-review`
-- `jobpipe show JOB_ID`
-- `jobpipe save JOB_ID`
-- `jobpipe package JOB_ID`
-- `jobpipe apply-flow JOB_ID`
-- `jobpipe skip JOB_ID`
-- `jobpipe add-text --file PATH`
-- `jobpipe add-url URL`
-- `jobpipe list`
-- `jobpipe analyze JOB_ID`
-- `jobpipe shortlist --min-fit INT --max-risk INT --limit INT`
-- `jobpipe tailor JOB_ID`
-- `jobpipe packet JOB_ID`
-- `jobpipe status JOB_ID STATUS`
-- `jobpipe edit JOB_ID [--title ...] [--company ...] [--location ...]`
-- `jobpipe due [--limit INT]`
-- `jobpipe open JOB_ID`
-- `jobpipe export`
-- `jobpipe sources list`
-- `jobpipe sources add --provider PROVIDER --company COMPANY [--company-slug SLUG] [--board-token TOKEN] [--account ACCOUNT]`
-- `jobpipe sources enable SOURCE_ID`
-- `jobpipe sources disable SOURCE_ID`
-- `jobpipe sources test [SOURCE_ID]`
+### 2. Ingest and score jobs
 
-## Notes
+- `jobpipe ingest` fetches jobs from the configured sources.
+- Each job receives a deterministic fit score, role-family classification, and risk/quality metadata.
+- `jobpipe list` shows the current queue and `jobpipe show <job-id>` shows the breakdown.
 
-- Ingest uses only local configuration plus the public Greenhouse/Lever APIs.
-- Fit scoring v1 is deterministic and explainable; no LLMs are used yet.
-- `score_job_fit_v1` is the canonical user-facing fit score. Review, batch-review, list, details, and analyze all render from that helper; SQLite `fit_score` is a cache only. The scorer is role-family-first, so remote/location bonuses cannot outrank a bad-fit family.
-- Tailoring is constrained by the candidate profile and never invents paid experience, tools, certifications, or years of experience.
-- `profile.md` is the editable local base resume/profile used for package generation.
+### 3. Review and learn
+
+- Use `jobpipe review` for a single-job decision loop.
+- Use `jobpipe batch-review` to step through the ranked queue.
+- When prompted, choose `saved`, `skipped`, `packaged`, or `applied` and optionally add a reason code and note.
+- `jobpipe feedback-report` shows how the deterministic learner is changing role-family and keyword weights.
+
+### 4. Package and apply
+
+- `jobpipe save <job-id>` marks a job as worth keeping.
+- `jobpipe package <job-id>` writes `job.md`, `fit.md`, `resume-tailored.md`, `cover-note.md`, and `apply.md` into the job-specific bundle directory.
+- `jobpipe apply-flow <job-id>` opens the apply URL, shows the generated files, and asks for manual confirmation before marking the job applied.
+
+### 5. Track outcomes
+
+- `jobpipe status <job-id> <status>` updates the application tracker.
+- `jobpipe due` lists follow-ups.
+- `jobpipe analytics` and `/analytics` summarize local tracker data and surface the top jobs to apply today.
+
+## Knowledge Representation and Scoring
+
+Job Pipe uses a deterministic knowledge graph rather than an LLM for core ranking.
+
+- `data/knowledge.yaml` defines canonical concepts, aliases, related concepts, role-family links, the available goals, and goal-dependent modifiers.
+- `data/search_profiles.yaml` selects one active goal and role preference tiers: `preferred`, `acceptable`, and `avoid`. Acceptable roles are neutral rather than conflicts.
+- `data/learned_weights.yaml` stores feedback-driven adjustments derived from saved, skipped, packaged, and applied decisions.
+- `score_job_fit_v1` combines base signals, goal modifiers, knowledge matches, preference tiers, practical constraints, and learned feedback weights.
+- Use `python3 -m jobpipe.cli goals`, `python3 -m jobpipe.cli goal get`, and `python3 -m jobpipe.cli goal set <goal-id>` to inspect or change the current objective.
+- The score is explainable: CLI details and dashboard views show the notes that produced the final fit score.
+- `score_job_fit_v1` is the canonical user-facing fit score. SQLite `fit_score` is a cache for convenience, not the source of truth.
+
+## Analytics and Dashboard
+
+The local FastAPI dashboard runs on `127.0.0.1:8765`.
+
+- `/` shows the overview summary.
+- `/jobs` provides filters for provider, company, score, packaging, follow-up due status, and text search.
+- `/kanban` groups jobs by pipeline stage.
+- `/views` links to saved filter presets.
+- `/followups` lists applied jobs that need attention.
+- `/analytics` summarizes applications today, applications this week, the current goal, jobs with positive goal impact, skip reasons, and role-family rates.
+
+The dashboard is read-only except for the same workflow actions exposed in the CLI: save, skip, package, open apply, open package, copy text, and move status.
+
+## Example Usage
+
+```fish
+jobpipe init
+jobpipe ingest
+jobpipe review
+jobpipe show 1
+jobpipe save 1
+jobpipe package 1
+jobpipe apply-flow 1
+jobpipe analytics
+```
+
+## Testing
+
+Run the full test suite from the repository root:
+
+```fish
+./venv/bin/python -m pytest -q
+```
+
+Useful focused checks:
+
+```fish
+./venv/bin/python -m pytest tests/test_web.py -q
+./venv/bin/python -m pytest tests/test_package_generation.py tests/test_deterministic_learning.py -q
+```
+
+## Roadmap / Next Improvements
+
+- Add more provider adapters so ingest covers more of the job sources you actually use.
+- Expand analytics with better follow-up planning and decision-history views.
+- Harden status and feedback validation across the CLI and dashboard.
+- Grow the knowledge graph and role packs for additional job families.
+- Keep adding regression tests around ingest, packaging, and dashboard filters as the workspace evolves.
+
+## Agent interface (v0.3.0)
+
+Job-Pipe exposes fourteen typed MCP tools for controlled source refresh and trials,
+canonical search and scoring, evidence-based eligibility, tracking, saving, and
+application preparation. Read-only is the default. Network trials require
+`--enable-source-trials`, ingestion requires `--enable-ingest`, and saving/package
+preparation requires `--enable-local-writes`. MCP preparation requires confirmed
+eligibility; no application is submitted externally.
+
+See [the agent interface guide](docs/AGENT_INTERFACE.md) for installation,
+Codex/Antigravity setup, permissions, schemas, and protocol validation.

@@ -1,0 +1,1975 @@
+{
+  "schema_version": 1,
+  "measured_at": "2026-10-29T07:16:29.357477+00:00",
+  "revalidated_at": "2026-10-29T07:26:58.013521+00:00",
+  "scope": "Production MCP services in disposable state. Public posting evidence; no applicant identity, contact details, or canonical-workspace paths.",
+  "career_pages": [
+    {
+      "company": "Automattic",
+      "careers_url": "https://automattic.com/work-with-us/",
+      "resolved_url": "https://automattic.com/work-with-us/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": []
+    },
+    {
+      "company": "Customer.io",
+      "careers_url": "https://customer.io/careers",
+      "resolved_url": "https://customer.io/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://job-boards.greenhouse.io/customerio"
+      ]
+    },
+    {
+      "company": "Grafana Labs",
+      "careers_url": "https://grafana.com/careers/",
+      "resolved_url": "https://grafana.com/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://job-boards.greenhouse.io/grafanalabs"
+      ]
+    },
+    {
+      "company": "Help Scout",
+      "careers_url": "https://www.helpscout.com/company/careers/",
+      "resolved_url": "https://www.helpscout.com/company/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/helpscout"
+      ]
+    },
+    {
+      "company": "Hugging Face",
+      "careers_url": "https://huggingface.co/join-us",
+      "resolved_url": "https://huggingface.co/JOIN-US",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://apply.workable.com/huggingface"
+      ]
+    },
+    {
+      "company": "Invisible Technologies",
+      "careers_url": "https://www.invisible.co/careers",
+      "resolved_url": "https://invisibletech.ai/join-us",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": []
+    },
+    {
+      "company": "LaunchDarkly",
+      "careers_url": "https://launchdarkly.com/careers/",
+      "resolved_url": "https://launchdarkly.com/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://boards.greenhouse.io/launchdarkly"
+      ]
+    },
+    {
+      "company": "Linear",
+      "careers_url": "https://linear.app/careers",
+      "resolved_url": "https://linear.app/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/Linear"
+      ]
+    },
+    {
+      "company": "Mistral AI",
+      "careers_url": "https://mistral.ai/careers/",
+      "resolved_url": "https://mistral.ai/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/mistral.ai"
+      ]
+    },
+    {
+      "company": "Notion",
+      "careers_url": "https://www.notion.com/careers",
+      "resolved_url": "https://www.notion.com/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/notion"
+      ]
+    },
+    {
+      "company": "OpenAI",
+      "careers_url": "https://openai.com/careers/",
+      "resolved_url": null,
+      "direct_fetch_status": "failed",
+      "error": "HTTP Error 403: Forbidden",
+      "ats_board_urls": [],
+      "supplemental_evidence": {
+        "url": "https://openai.com/careers/search/",
+        "observation": "Official page inspected with web browser; Apply now links point to jobs.ashbyhq.com. Direct Python request returned 403; no bypass attempted."
+      }
+    },
+    {
+      "company": "PostHog",
+      "careers_url": "https://posthog.com/careers",
+      "resolved_url": "https://posthog.com/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [],
+      "supplemental_evidence": {
+        "url": "https://posthog.com/handbook/people/hiring-process",
+        "observation": "Official handbook explicitly identifies Ashby as its ATS and a mandatory paid full-day SuperDay hiring stage."
+      }
+    },
+    {
+      "company": "Postman",
+      "careers_url": "https://www.postman.com/company/careers/open-positions/",
+      "resolved_url": "https://www.postman.com/company/careers/open-positions/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": []
+    },
+    {
+      "company": "QA Wolf",
+      "careers_url": "https://www.qawolf.com/careers",
+      "resolved_url": "https://www.qawolf.com/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": []
+    },
+    {
+      "company": "Recharge",
+      "careers_url": "https://getrecharge.com/careers/",
+      "resolved_url": "https://getrecharge.com/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/recharge"
+      ]
+    },
+    {
+      "company": "Sentry",
+      "careers_url": "https://sentry.io/careers/",
+      "resolved_url": "https://sentry.io/careers/",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/sentry"
+      ]
+    },
+    {
+      "company": "Testlio",
+      "careers_url": "https://testlio.com/careers/",
+      "resolved_url": "https://www.testlio.com/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://boards.greenhouse.io/embed/job_board?for=testlio"
+      ]
+    },
+    {
+      "company": "Vercel",
+      "careers_url": "https://vercel.com/careers",
+      "resolved_url": "https://vercel.com/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://job-boards.greenhouse.io/vercel"
+      ]
+    },
+    {
+      "company": "Zapier",
+      "careers_url": "https://zapier.com/jobs",
+      "resolved_url": "https://zapier.com/jobs",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": [
+        "https://jobs.ashbyhq.com/zapier"
+      ]
+    },
+    {
+      "company": "dbt Labs",
+      "careers_url": "https://www.getdbt.com/careers",
+      "resolved_url": "https://www.getdbt.com/about-us/careers",
+      "direct_fetch_status": "success",
+      "error": null,
+      "ats_board_urls": []
+    }
+  ],
+  "all_source_trials": {
+    "sources_tested": 21,
+    "successful": 15,
+    "failed": 6,
+    "fetched": 2929,
+    "passed": 11,
+    "yield_rate": 0.0037555479685899623,
+    "denominator": "Fetched postings across successful trials only; failed measurements are unknown, not zero."
+  },
+  "trials": [
+    {
+      "company": "GitLab",
+      "source_id": "greenhouse:gitlab",
+      "requested_source_id": "greenhouse:gitlab",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 232,
+      "passed": 0,
+      "rejected": 232,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 232,
+        "missing_title_signal": 28,
+        "profile_negative_keyword": 232,
+        "role_family_avoided": 1,
+        "role_family_not_targeted": 193,
+        "seniority_excluded": 219
+      }
+    },
+    {
+      "company": "Stripe",
+      "source_id": "greenhouse:stripe",
+      "requested_source_id": "greenhouse:stripe",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 722,
+      "passed": 5,
+      "rejected": 717,
+      "yield_rate": 0.006925207756232687,
+      "eligibility_denominator": 5,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 4,
+        "ineligible": 1
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 612,
+        "keyword_requirement_missing": 280,
+        "missing_title_signal": 117,
+        "profile_negative_keyword": 606,
+        "role_family_avoided": 9,
+        "role_family_not_targeted": 661,
+        "seniority_excluded": 568
+      }
+    },
+    {
+      "company": "Coinbase",
+      "source_id": "greenhouse:coinbase",
+      "requested_source_id": "greenhouse:coinbase",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/coinbase/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 228,
+      "passed": 3,
+      "rejected": 225,
+      "yield_rate": 0.013157894736842105,
+      "eligibility_denominator": 3,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 3,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 205,
+        "missing_title_signal": 43,
+        "profile_negative_keyword": 204,
+        "role_family_avoided": 4,
+        "role_family_not_targeted": 182,
+        "seniority_excluded": 180
+      }
+    },
+    {
+      "company": "Postman",
+      "source_id": "greenhouse:postman",
+      "requested_source_id": "greenhouse:postman",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/postman/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board postman: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Mistral AI",
+      "source_id": "lever:mistral",
+      "requested_source_id": "lever:mistral",
+      "verified_endpoint": "https://api.lever.co/v0/postings/mistral?mode=json&include=content",
+      "status": "success",
+      "error": null,
+      "fetched": 0,
+      "passed": 0,
+      "rejected": 0,
+      "yield_rate": null,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Wellfound",
+      "source_id": "lever:angellist",
+      "requested_source_id": "lever:angellist",
+      "verified_endpoint": "https://api.lever.co/v0/postings/angellist?mode=json&include=content",
+      "status": "success",
+      "error": null,
+      "fetched": 24,
+      "passed": 0,
+      "rejected": 24,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 18,
+        "keyword_requirement_missing": 17,
+        "missing_title_signal": 7,
+        "profile_negative_keyword": 18,
+        "role_family_avoided": 3,
+        "role_family_not_targeted": 23,
+        "seniority_excluded": 19
+      }
+    },
+    {
+      "company": "Datadog",
+      "source_id": "greenhouse:datadog",
+      "requested_source_id": "greenhouse:datadog",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 396,
+      "passed": 2,
+      "rejected": 394,
+      "yield_rate": 0.005050505050505051,
+      "eligibility_denominator": 2,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 2
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 381,
+        "keyword_requirement_missing": 262,
+        "missing_title_signal": 50,
+        "profile_negative_keyword": 350,
+        "role_family_avoided": 1,
+        "role_family_not_targeted": 387,
+        "seniority_excluded": 315
+      }
+    },
+    {
+      "company": "Figma",
+      "source_id": "greenhouse:figma",
+      "requested_source_id": "greenhouse:figma",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/figma/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 141,
+      "passed": 0,
+      "rejected": 141,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 134,
+        "keyword_requirement_missing": 96,
+        "missing_title_signal": 15,
+        "profile_negative_keyword": 133,
+        "role_family_not_targeted": 139,
+        "seniority_excluded": 120
+      }
+    },
+    {
+      "company": "Linear",
+      "source_id": "greenhouse:linear",
+      "requested_source_id": "greenhouse:linear",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/linear/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board linear: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Notion",
+      "source_id": "greenhouse:notion",
+      "requested_source_id": "greenhouse:notion",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/notion/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board notion: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "OpenAI",
+      "source_id": "greenhouse:openai",
+      "requested_source_id": "greenhouse:openai",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/openai/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board openai: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Anthropic",
+      "source_id": "greenhouse:anthropic",
+      "requested_source_id": "greenhouse:anthropic",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 680,
+      "passed": 0,
+      "rejected": 680,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 680,
+        "keyword_requirement_missing": 253,
+        "missing_title_signal": 149,
+        "profile_negative_keyword": 680,
+        "role_family_avoided": 224,
+        "role_family_not_targeted": 675,
+        "seniority_excluded": 553
+      }
+    },
+    {
+      "company": "Scale AI",
+      "source_id": "greenhouse:scaleai",
+      "requested_source_id": "greenhouse:scaleai",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/scaleai/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 171,
+      "passed": 0,
+      "rejected": 171,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 147,
+        "keyword_requirement_missing": 58,
+        "missing_title_signal": 44,
+        "profile_negative_keyword": 148,
+        "role_family_avoided": 5,
+        "role_family_not_targeted": 160,
+        "seniority_excluded": 153
+      }
+    },
+    {
+      "company": "Hugging Face",
+      "source_id": "greenhouse:huggingface",
+      "requested_source_id": "greenhouse:huggingface",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/huggingface/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board huggingface: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Customer.io",
+      "source_id": "greenhouse:customerio",
+      "requested_source_id": "greenhouse:customerio",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/customerio/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 25,
+      "passed": 0,
+      "rejected": 25,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 25,
+        "missing_title_signal": 3,
+        "profile_negative_keyword": 25,
+        "role_family_not_targeted": 24,
+        "seniority_excluded": 25
+      }
+    },
+    {
+      "company": "Grafana Labs",
+      "source_id": "greenhouse:grafanalabs",
+      "requested_source_id": "greenhouse:grafanalabs",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/grafanalabs/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 131,
+      "passed": 0,
+      "rejected": 131,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 131,
+        "profile_negative_keyword": 131,
+        "role_family_avoided": 1,
+        "role_family_not_targeted": 115,
+        "seniority_excluded": 117
+      }
+    },
+    {
+      "company": "LaunchDarkly",
+      "source_id": "greenhouse:launchdarkly",
+      "requested_source_id": "greenhouse:launchdarkly",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/launchdarkly/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 51,
+      "passed": 0,
+      "rejected": 51,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 45,
+        "keyword_requirement_missing": 13,
+        "missing_title_signal": 6,
+        "profile_negative_keyword": 45,
+        "role_family_not_targeted": 46,
+        "seniority_excluded": 48
+      }
+    },
+    {
+      "company": "Testlio",
+      "source_id": "greenhouse:testlio",
+      "requested_source_id": "greenhouse:testlio",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/testlio/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 16,
+      "passed": 1,
+      "rejected": 15,
+      "yield_rate": 0.0625,
+      "eligibility_denominator": 1,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 1,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 7,
+        "missing_title_signal": 3,
+        "profile_negative_keyword": 7,
+        "role_family_not_targeted": 14,
+        "seniority_excluded": 9
+      }
+    },
+    {
+      "company": "Invisible Technologies",
+      "source_id": "greenhouse:invisibletech",
+      "requested_source_id": "greenhouse:invisibletech",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/invisibletech/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 20,
+      "passed": 0,
+      "rejected": 20,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 14,
+        "profile_negative_keyword": 14,
+        "role_family_avoided": 1,
+        "role_family_not_targeted": 18,
+        "seniority_excluded": 15
+      }
+    },
+    {
+      "company": "PostHog",
+      "source_id": "greenhouse:posthog",
+      "requested_source_id": "greenhouse:posthog",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/posthog/jobs?content=true",
+      "status": "failed",
+      "error": "Failed to fetch Greenhouse board posthog: HTTPError: HTTP Error 404: Not Found",
+      "fetched": null,
+      "passed": null,
+      "rejected": null,
+      "yield_rate": null,
+      "eligibility_denominator": null,
+      "eligibility_counts": {
+        "eligible": null,
+        "needs_review": null,
+        "ineligible": null
+      },
+      "rejection_reasons": {}
+    },
+    {
+      "company": "Vercel",
+      "source_id": "greenhouse:vercel",
+      "requested_source_id": "greenhouse:vercel",
+      "verified_endpoint": "https://boards-api.greenhouse.io/v1/boards/vercel/jobs?content=true",
+      "status": "success",
+      "error": null,
+      "fetched": 92,
+      "passed": 0,
+      "rejected": 92,
+      "yield_rate": 0.0,
+      "eligibility_denominator": 0,
+      "eligibility_counts": {
+        "eligible": 0,
+        "needs_review": 0,
+        "ineligible": 0
+      },
+      "rejection_reasons": {
+        "keyword_excluded": 92,
+        "keyword_requirement_missing": 35,
+        "missing_title_signal": 12,
+        "profile_negative_keyword": 75,
+        "role_family_avoided": 2,
+        "role_family_not_targeted": 91,
+        "seniority_excluded": 84
+      }
+    }
+  ],
+  "selected_refresh": [
+    {
+      "latest_ingest_timestamp": "2026-10-29T07:19:28+00:00",
+      "enabled_sources": [
+        "greenhouse:gitlab",
+        "greenhouse:stripe",
+        "greenhouse:coinbase",
+        "greenhouse:postman",
+        "lever:mistral",
+        "lever:angellist",
+        "greenhouse:datadog",
+        "greenhouse:figma",
+        "greenhouse:anthropic",
+        "greenhouse:scaleai",
+        "greenhouse:customerio",
+        "greenhouse:grafanalabs",
+        "greenhouse:launchdarkly",
+        "greenhouse:testlio",
+        "greenhouse:invisibletech",
+        "greenhouse:posthog",
+        "greenhouse:vercel"
+      ],
+      "current_operations": [],
+      "run": {
+        "id": 1,
+        "started_at": "2026-10-29T07:18:56+00:00",
+        "completed_at": "2026-10-29T07:19:28+00:00",
+        "profile": "miles",
+        "goal": "get_employed_fast",
+        "status": "completed",
+        "error": null
+      },
+      "sources_checked": 4,
+      "successful_sources": 4,
+      "failed_sources": 0,
+      "fetched": 1362,
+      "passed": 11,
+      "inserted": 11,
+      "updated": 0,
+      "yield_rate": 0.008076358296622614,
+      "measurement_scope": "Selected run; successful source measurements only. Current corpus is reported separately.",
+      "source_results": [
+        {
+          "source_id": "greenhouse:coinbase",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 228,
+          "passed": 3,
+          "rejected": 225,
+          "inserted": 3,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:datadog",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 396,
+          "passed": 2,
+          "rejected": 394,
+          "inserted": 2,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:stripe",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 722,
+          "passed": 5,
+          "rejected": 717,
+          "inserted": 5,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:testlio",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 16,
+          "passed": 1,
+          "rejected": 15,
+          "inserted": 1,
+          "updated": 0
+        }
+      ],
+      "current_corpus": {
+        "active_jobs": 11,
+        "employers": 4,
+        "sources": 4,
+        "largest_employer_share": 0.45454545454545453,
+        "warning": true,
+        "top_employers": [
+          {
+            "company": "Stripe",
+            "active_jobs": 5,
+            "share": 0.45454545454545453
+          },
+          {
+            "company": "Coinbase",
+            "active_jobs": 3,
+            "share": 0.2727272727272727
+          },
+          {
+            "company": "Datadog",
+            "active_jobs": 2,
+            "share": 0.18181818181818182
+          },
+          {
+            "company": "Testlio",
+            "active_jobs": 1,
+            "share": 0.09090909090909091
+          }
+        ]
+      },
+      "stale_source_warnings": [
+        "greenhouse:gitlab: no successful completed measurement",
+        "greenhouse:postman: no successful completed measurement",
+        "lever:mistral: no successful completed measurement",
+        "lever:angellist: no successful completed measurement",
+        "greenhouse:figma: no successful completed measurement",
+        "greenhouse:anthropic: no successful completed measurement",
+        "greenhouse:scaleai: no successful completed measurement",
+        "greenhouse:customerio: no successful completed measurement",
+        "greenhouse:grafanalabs: no successful completed measurement",
+        "greenhouse:launchdarkly: no successful completed measurement",
+        "greenhouse:invisibletech: no successful completed measurement",
+        "greenhouse:posthog: no successful completed measurement",
+        "greenhouse:vercel: no successful completed measurement"
+      ]
+    }
+  ],
+  "eligibility_counts": {
+    "eligible": 0,
+    "needs_review": 8,
+    "ineligible": 3
+  },
+  "representative_assessments": [
+    {
+      "job_id": 2,
+      "title": "Data Engineer Intern",
+      "company": "Coinbase",
+      "location": "Hybrid - San Francisco, CA",
+      "application_url": "https://www.coinbase.com/careers/positions/8175459?gh_jid=8175459",
+      "technical_fit_score": 99,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Onsite/hybrid attendance or relocation is unverified.",
+        "Internship eligibility is unresolved."
+      ],
+      "missing_applicant_information": [
+        "Verified ability to attend this work location; relocation is not assumed.",
+        "Verified enrollment, institution country and graduation year as applicable."
+      ],
+      "missing_employer_information": [
+        "Complete internship eligibility rules."
+      ],
+      "experience_requirements": []
+    },
+    {
+      "job_id": 1,
+      "title": "Analytics Engineer Intern",
+      "company": "Coinbase",
+      "location": "Hybrid - New York, NY",
+      "application_url": "https://www.coinbase.com/careers/positions/8175471?gh_jid=8175471",
+      "technical_fit_score": 83,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Onsite/hybrid attendance or relocation is unverified.",
+        "Internship eligibility is unresolved."
+      ],
+      "missing_applicant_information": [
+        "Verified ability to attend this work location; relocation is not assumed.",
+        "Verified enrollment, institution country and graduation year as applicable."
+      ],
+      "missing_employer_information": [
+        "Complete internship eligibility rules."
+      ],
+      "experience_requirements": []
+    },
+    {
+      "job_id": 7,
+      "title": "Backend Engineer, Developer & End-user Experience Platform",
+      "company": "Stripe",
+      "location": "Toronto Canada, San Francisco, Remote in US, Remote in Canada",
+      "application_url": "https://stripe.com/jobs/search?gh_jid=7292520",
+      "technical_fit_score": 74,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Residence is unverified.",
+        "Work authorization is unverified.",
+        "Experience range or alternative is ambiguous."
+      ],
+      "missing_applicant_information": [
+        "Verified country of residence.",
+        "Verified work authorization for the employing country."
+      ],
+      "missing_employer_information": [
+        "Clarify experience range/alternatives."
+      ],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": 12.0,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": true,
+          "evidence": "2\u201312+ years of industry software engineering experience (does not include internships or co-ops)"
+        }
+      ]
+    },
+    {
+      "job_id": 3,
+      "title": "Forward Deployed Engineer Intern (HR Technology)",
+      "company": "Coinbase",
+      "location": "Hybrid - New York, NY",
+      "application_url": "https://www.coinbase.com/careers/positions/8175510?gh_jid=8175510",
+      "technical_fit_score": 67,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Onsite/hybrid attendance or relocation is unverified.",
+        "Internship eligibility is unresolved."
+      ],
+      "missing_applicant_information": [
+        "Verified ability to attend this work location; relocation is not assumed.",
+        "Verified enrollment, institution country and graduation year as applicable."
+      ],
+      "missing_employer_information": [
+        "Complete internship eligibility rules."
+      ],
+      "experience_requirements": []
+    },
+    {
+      "job_id": 11,
+      "title": "QA Tester (Future Roles)",
+      "company": "Testlio",
+      "location": "Global",
+      "application_url": "https://job-boards.greenhouse.io/testlio/jobs/6953297",
+      "technical_fit_score": 53,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "No unambiguous hiring region and workplace arrangement.",
+        "Work authorization is unverified.",
+        "Experience range or alternative is ambiguous.",
+        "This is a future-opportunity/talent-pool posting, not a confirmed current vacancy.",
+        "Posting identifies a future-role/talent-pool application, not a confirmed current vacancy."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for the employing country."
+      ],
+      "missing_employer_information": [
+        "Explicit work location and permitted remote hiring region.",
+        "Clarify experience range/alternatives.",
+        "Confirm a current vacancy before asserting application readiness.",
+        "Confirm a specific currently open role before asserting application readiness."
+      ],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": null,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": true,
+          "evidence": "Proven experience (2+ years) as a Software Tester or similar role, with a strong understanding of software testing principles, methodologies, and tools (such as Jira, TestRail, Xray, or similar)."
+        }
+      ]
+    },
+    {
+      "job_id": 6,
+      "title": "Backend Engineer, Developer & End-user Experience Platform",
+      "company": "Stripe",
+      "location": "SEA, SF, NY, Toronto",
+      "application_url": "https://stripe.com/jobs/search?gh_jid=7476555",
+      "technical_fit_score": 43,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Description hiring region conflicts with the listed location.",
+        "Work authorization is unverified.",
+        "Experience range or alternative is ambiguous."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for the employing country."
+      ],
+      "missing_employer_information": [
+        "Confirm which listed/remote locations apply to this position.",
+        "Clarify experience range/alternatives."
+      ],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": 12.0,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": true,
+          "evidence": "2\u201312+ years of industry software engineering experience (does not include internships or co-ops)"
+        }
+      ]
+    },
+    {
+      "job_id": 10,
+      "title": "Backend Engineer, Payments & Risk",
+      "company": "Stripe",
+      "location": "Toronto, Canada",
+      "application_url": "https://stripe.com/jobs/search?gh_jid=8260985",
+      "technical_fit_score": 41,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "Onsite/hybrid attendance or relocation is unverified.",
+        "Work authorization is unverified.",
+        "Experience range or alternative is ambiguous."
+      ],
+      "missing_applicant_information": [
+        "Verified ability to attend this work location; relocation is not assumed.",
+        "Verified work authorization for CA."
+      ],
+      "missing_employer_information": [
+        "Clarify experience range/alternatives."
+      ],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": 12.0,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": true,
+          "evidence": "2-12+ years of industry software engineering experience (does not include internships nor includes co-ops)"
+        }
+      ]
+    },
+    {
+      "job_id": 8,
+      "title": "Backend Engineer, Link",
+      "company": "Stripe",
+      "location": "NYC, Sea, SF, Tor",
+      "application_url": "https://stripe.com/jobs/search?gh_jid=8131144",
+      "technical_fit_score": 37,
+      "eligibility_status": "needs_review",
+      "concerns": [
+        "No unambiguous hiring region and workplace arrangement.",
+        "Work authorization is unverified.",
+        "Experience range or alternative is ambiguous."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for the employing country."
+      ],
+      "missing_employer_information": [
+        "Explicit work location and permitted remote hiring region.",
+        "Clarify experience range/alternatives."
+      ],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": 10.0,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": true,
+          "evidence": "2\u201310+ years of industry software engineering experience (does not include internships or co-ops)"
+        }
+      ]
+    },
+    {
+      "job_id": 9,
+      "title": "Backend Engineer, Payments Experiences",
+      "company": "Stripe",
+      "location": "Sao Paulo",
+      "application_url": "https://stripe.com/jobs/search?gh_jid=7895287",
+      "technical_fit_score": 30,
+      "eligibility_status": "ineligible",
+      "concerns": [
+        "Posting location is outside explicitly allowed/preferred countries.",
+        "Work authorization is unverified.",
+        "Professional experience is unverified; projects are not employment."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for BR.",
+        "Verified professional experience years and relevant areas."
+      ],
+      "missing_employer_information": [],
+      "experience_requirements": [
+        {
+          "minimum": 2.0,
+          "maximum": null,
+          "upper_open": true,
+          "preferred": false,
+          "ambiguous": false,
+          "evidence": "2+ years of backend engineering experience"
+        }
+      ]
+    },
+    {
+      "job_id": 4,
+      "title": "Software Engineering Intern",
+      "company": "Datadog",
+      "location": "Madrid, Spain",
+      "application_url": "https://careers.datadoghq.com/detail/8114161/?gh_jid=8114161",
+      "technical_fit_score": 26,
+      "eligibility_status": "ineligible",
+      "concerns": [
+        "Posting location is outside explicitly allowed/preferred countries.",
+        "Work authorization is unverified.",
+        "Internship eligibility is unresolved."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for ES.",
+        "Verified enrollment, institution country and graduation year as applicable."
+      ],
+      "missing_employer_information": [
+        "Complete internship eligibility rules."
+      ],
+      "experience_requirements": []
+    },
+    {
+      "job_id": 5,
+      "title": "Software Engineering Intern",
+      "company": "Datadog",
+      "location": "Paris, France",
+      "application_url": "https://careers.datadoghq.com/detail/8114186/?gh_jid=8114186",
+      "technical_fit_score": 26,
+      "eligibility_status": "ineligible",
+      "concerns": [
+        "Posting location conflicts with explicit preference: paris.",
+        "Work authorization is unverified.",
+        "Internship eligibility is unresolved."
+      ],
+      "missing_applicant_information": [
+        "Verified work authorization for FR.",
+        "Verified enrollment, institution country and graduation year as applicable."
+      ],
+      "missing_employer_information": [
+        "Complete internship eligibility rules."
+      ],
+      "experience_requirements": []
+    }
+  ],
+  "canonical_scores_match": true,
+  "canonical_state_unchanged": true,
+  "production_sources_enabled": 0,
+  "proposed_disabled_catalog_sources": 7,
+  "live_applications_prepared": 0,
+  "synthetic_acceptance_packages": 5,
+  "external_submissions": 0,
+  "limitations": [
+    "No confirmed eligible current opportunity was established.",
+    "Testlio QA Tester (Future Roles) is a talent pool, not a verified current opening.",
+    "Most candidates need a currently unsupported ATS or have no passes under current rules.",
+    "Residence, state, employment history and internship enrollment were not inferred.",
+    "No low-burden hiring process was established for a confirmed eligible posting.",
+    "Fetch success does not independently certify every posting remains open.",
+    "Trial counts can change with inventories and are not a controlled causal comparison to the prior experiment."
+  ],
+  "measurement_cohort": "Supplementary 21-source audit; selected four-source refresh. See primary_discovery for the enabled-source refresh and fourteen candidate trials.",
+  "primary_discovery": {
+    "measured_at": "2026-10-29T07:15:10.074712+00:00",
+    "reassessed_at": "2026-10-29T07:25:34.456456+00:00",
+    "enabled_refresh": {
+      "latest_ingest_timestamp": "2026-10-29T07:16:59+00:00",
+      "enabled_sources": [
+        "greenhouse:gitlab",
+        "greenhouse:stripe",
+        "greenhouse:coinbase",
+        "greenhouse:postman",
+        "lever:mistral",
+        "lever:angellist",
+        "greenhouse:datadog",
+        "greenhouse:figma",
+        "greenhouse:anthropic",
+        "greenhouse:scaleai"
+      ],
+      "current_operations": [],
+      "run": {
+        "id": 1,
+        "started_at": "2026-10-29T07:15:12+00:00",
+        "completed_at": "2026-10-29T07:16:59+00:00",
+        "profile": "miles",
+        "goal": "get_employed_fast",
+        "status": "completed",
+        "error": null
+      },
+      "sources_checked": 10,
+      "successful_sources": 9,
+      "failed_sources": 1,
+      "fetched": 2594,
+      "passed": 10,
+      "inserted": 10,
+      "updated": 0,
+      "yield_rate": 0.0038550501156515036,
+      "measurement_scope": "Selected run; successful source measurements only. Current corpus is reported separately.",
+      "source_results": [
+        {
+          "source_id": "greenhouse:anthropic",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 680,
+          "passed": 0,
+          "rejected": 680,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:coinbase",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 228,
+          "passed": 3,
+          "rejected": 225,
+          "inserted": 3,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:datadog",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 396,
+          "passed": 2,
+          "rejected": 394,
+          "inserted": 2,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:figma",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 141,
+          "passed": 0,
+          "rejected": 141,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:gitlab",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 232,
+          "passed": 0,
+          "rejected": 232,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:postman",
+          "fetch_status": "failed",
+          "error": "Failed to fetch Greenhouse board postman: HTTPError: HTTP Error 404: Not Found",
+          "fetched": null,
+          "passed": null,
+          "rejected": null,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:scaleai",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 171,
+          "passed": 0,
+          "rejected": 171,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "greenhouse:stripe",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 722,
+          "passed": 5,
+          "rejected": 717,
+          "inserted": 5,
+          "updated": 0
+        },
+        {
+          "source_id": "lever:angellist",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 24,
+          "passed": 0,
+          "rejected": 24,
+          "inserted": 0,
+          "updated": 0
+        },
+        {
+          "source_id": "lever:mistral",
+          "fetch_status": "success",
+          "error": null,
+          "fetched": 0,
+          "passed": 0,
+          "rejected": 0,
+          "inserted": 0,
+          "updated": 0
+        }
+      ],
+      "current_corpus": {
+        "active_jobs": 10,
+        "employers": 3,
+        "sources": 3,
+        "largest_employer_share": 0.5,
+        "warning": true,
+        "top_employers": [
+          {
+            "company": "Stripe",
+            "active_jobs": 5,
+            "share": 0.5
+          },
+          {
+            "company": "Coinbase",
+            "active_jobs": 3,
+            "share": 0.3
+          },
+          {
+            "company": "Datadog",
+            "active_jobs": 2,
+            "share": 0.2
+          }
+        ]
+      },
+      "stale_source_warnings": [
+        "greenhouse:postman: no successful completed measurement"
+      ]
+    },
+    "eligibility_counts": {
+      "eligible": 0,
+      "needs_review": 7,
+      "ineligible": 3
+    },
+    "strong_eligible_count": 0,
+    "production_state_unchanged": true,
+    "configuration_unchanged": true,
+    "trials": [
+      {
+        "requested_source": "greenhouse:posthog",
+        "source_id": "greenhouse:posthog",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board posthog: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:vercel",
+        "source_id": "greenhouse:vercel",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 92,
+        "passed": 0,
+        "rejected": 92,
+        "yield_rate": 0.0,
+        "eligibility_denominator": 0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:postman",
+        "source_id": "greenhouse:postman",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board postman: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "lever:mistral",
+        "source_id": "lever:mistral",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 0,
+        "passed": 0,
+        "rejected": 0,
+        "yield_rate": null,
+        "eligibility_denominator": 0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:linear",
+        "source_id": "greenhouse:linear",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board linear: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:notion",
+        "source_id": "greenhouse:notion",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board notion: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:openai",
+        "source_id": "greenhouse:openai",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board openai: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:huggingface",
+        "source_id": "greenhouse:huggingface",
+        "status": "failed",
+        "error": "Failed to fetch Greenhouse board huggingface: HTTPError: HTTP Error 404: Not Found",
+        "tool_error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:customerio",
+        "source_id": "greenhouse:customerio",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 25,
+        "passed": 0,
+        "rejected": 25,
+        "yield_rate": 0.0,
+        "eligibility_denominator": 0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:grafanalabs",
+        "source_id": "greenhouse:grafanalabs",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 131,
+        "passed": 0,
+        "rejected": 131,
+        "yield_rate": 0.0,
+        "eligibility_denominator": 0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        },
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "greenhouse:canonical",
+        "source_id": "greenhouse:canonical",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 314,
+        "passed": 6,
+        "rejected": 308,
+        "yield_rate": 0.01910828025477707,
+        "eligibility_denominator": 6,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 4,
+          "ineligible": 2
+        },
+        "representative_jobs": [
+          {
+            "external_id": "2456563",
+            "title": "Cloud Support Engineer",
+            "company": "Canonical",
+            "location": "Home based - Worldwide",
+            "application_url": "https://job-boards.greenhouse.io/canonical/jobs/2456563",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "Residence is unverified.",
+              "Work authorization is unverified."
+            ]
+          },
+          {
+            "external_id": "5370815",
+            "title": "Junior Linux Kernel Engineer - Ubuntu",
+            "company": "Canonical",
+            "location": "Home based - Worldwide",
+            "application_url": "https://job-boards.greenhouse.io/canonical/jobs/5370815",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "Residence is unverified.",
+              "Work authorization is unverified."
+            ]
+          },
+          {
+            "external_id": "6635593",
+            "title": "Software Support Engineer",
+            "company": "Canonical",
+            "location": "Home based - Worldwide",
+            "application_url": "https://job-boards.greenhouse.io/canonical/jobs/6635593",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "Residence is unverified.",
+              "Work authorization is unverified."
+            ]
+          },
+          {
+            "external_id": "6076942",
+            "title": "Ubuntu Linux Kernel Engineer - BIOS/Firmware",
+            "company": "Canonical",
+            "location": "Home Based - APAC",
+            "application_url": "https://job-boards.greenhouse.io/canonical/jobs/6076942",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "No unambiguous hiring region and workplace arrangement.",
+              "Work authorization is unverified."
+            ]
+          },
+          {
+            "external_id": "7975990",
+            "title": "Software Quality Assurance Engineer - Linux, PC, IoT",
+            "company": "Canonical",
+            "location": "Office Based - Taipei, Taiwan",
+            "application_url": "https://job-boards.greenhouse.io/canonical/jobs/7975990",
+            "eligibility_status": "ineligible",
+            "concerns": [
+              "Posting location is outside explicitly allowed/preferred countries.",
+              "Work authorization is unverified."
+            ]
+          }
+        ]
+      },
+      {
+        "requested_source": "greenhouse:testlio",
+        "source_id": "greenhouse:testlio",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 16,
+        "passed": 1,
+        "rejected": 15,
+        "yield_rate": 0.0625,
+        "eligibility_denominator": 1,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 1,
+          "ineligible": 0
+        },
+        "representative_jobs": [
+          {
+            "external_id": "6953297",
+            "title": "QA Tester (Future Roles)",
+            "company": "Testlio",
+            "location": "Global",
+            "application_url": "https://job-boards.greenhouse.io/testlio/jobs/6953297",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "No unambiguous hiring region and workplace arrangement.",
+              "Work authorization is unverified.",
+              "Experience range or alternative is ambiguous.",
+              "This is a future-opportunity/talent-pool posting, not a confirmed current vacancy.",
+              "Posting identifies a future-role/talent-pool application, not a confirmed current vacancy."
+            ]
+          }
+        ]
+      },
+      {
+        "requested_source": "lever:weloglobal",
+        "source_id": null,
+        "status": null,
+        "error": null,
+        "tool_error": {
+          "code": "operation_timeout",
+          "message": "Source trial exceeded its 30-second deadline; canonical data is unchanged."
+        },
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_denominator": null,
+        "eligibility_counts": null,
+        "representative_jobs": []
+      },
+      {
+        "requested_source": "lever:rws",
+        "source_id": "lever:rws",
+        "status": "success",
+        "error": null,
+        "tool_error": null,
+        "fetched": 156,
+        "passed": 12,
+        "rejected": 144,
+        "yield_rate": 0.07692307692307693,
+        "eligibility_denominator": 12,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 2,
+          "ineligible": 10
+        },
+        "representative_jobs": [
+          {
+            "external_id": "b6ae34f4-57e5-4bb8-8f29-4c69cf25ecbd",
+            "title": "Speech AI Evaluation Specialist - Chinese Simplified (USA)",
+            "company": "RWS TrainAI",
+            "location": "Remote",
+            "application_url": "https://jobs.lever.co/rws/b6ae34f4-57e5-4bb8-8f29-4c69cf25ecbd/apply",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "Residence is unverified.",
+              "Native-level language proficiency requires explicit verification."
+            ]
+          },
+          {
+            "external_id": "6488833f-86c3-480c-9dd1-1667f27a372c",
+            "title": "Speech AI Evaluation Specialist - Vietnamese (USA)",
+            "company": "RWS TrainAI",
+            "location": "Remote",
+            "application_url": "https://jobs.lever.co/rws/6488833f-86c3-480c-9dd1-1667f27a372c/apply",
+            "eligibility_status": "needs_review",
+            "concerns": [
+              "Residence is unverified.",
+              "Native-level language proficiency requires explicit verification."
+            ]
+          },
+          {
+            "external_id": "5bd8381a-0dd4-4ebb-83e4-05300c55cd7a",
+            "title": "Speech AI Evaluation Specialist - Chinese Simplified (Malaysia)",
+            "company": "RWS TrainAI",
+            "location": "Kuala Lumpur",
+            "application_url": "https://jobs.lever.co/rws/5bd8381a-0dd4-4ebb-83e4-05300c55cd7a/apply",
+            "eligibility_status": "ineligible",
+            "concerns": [
+              "Posting location is outside explicitly allowed/preferred countries.",
+              "Work authorization is unverified.",
+              "Native-level language proficiency requires explicit verification."
+            ]
+          },
+          {
+            "external_id": "048d58d0-c720-46b4-a9c8-f05569cd452b",
+            "title": "Speech AI Evaluation Specialist - Chinese Simplified (Thailand)",
+            "company": "RWS TrainAI",
+            "location": "Bangkok",
+            "application_url": "https://jobs.lever.co/rws/048d58d0-c720-46b4-a9c8-f05569cd452b/apply",
+            "eligibility_status": "ineligible",
+            "concerns": [
+              "Posting location is outside explicitly allowed/preferred countries.",
+              "Work authorization is unverified.",
+              "Native-level language proficiency requires explicit verification."
+            ]
+          },
+          {
+            "external_id": "c4b97c42-0005-4a1c-ac6c-e3f00d1fc6d4",
+            "title": "Speech AI Evaluation Specialist - French (France)",
+            "company": "RWS TrainAI",
+            "location": "Paris",
+            "application_url": "https://jobs.lever.co/rws/c4b97c42-0005-4a1c-ac6c-e3f00d1fc6d4/apply",
+            "eligibility_status": "ineligible",
+            "concerns": [
+              "Posting location conflicts with explicit preference: paris.",
+              "Work authorization is unverified.",
+              "Native-level language proficiency requires explicit verification."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "separate_candidate_cohort": {
+    "measured_at": "2026-10-29T07:15:10.074712+00:00",
+    "reassessed_at": "2026-10-29T07:25:34.456456+00:00",
+    "scope": "Separate fourteen-trial cohort; overlaps the broader cohort. Do not sum cohorts.",
+    "trial_sources": 14,
+    "successful": 7,
+    "fetched": 734,
+    "passed": 19,
+    "yield_rate": 0.025885558583106268,
+    "eligibility_counts": {
+      "eligible": 0,
+      "needs_review": 7,
+      "ineligible": 12
+    },
+    "trials": [
+      {
+        "requested_source": "greenhouse:posthog",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board posthog: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "greenhouse:vercel",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 92,
+        "passed": 0,
+        "rejected": 92,
+        "yield_rate": 0.0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        }
+      },
+      {
+        "requested_source": "greenhouse:postman",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board postman: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "lever:mistral",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 0,
+        "passed": 0,
+        "rejected": 0,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        }
+      },
+      {
+        "requested_source": "greenhouse:linear",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board linear: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "greenhouse:notion",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board notion: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "greenhouse:openai",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board openai: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "greenhouse:huggingface",
+        "status": "failed",
+        "tool_error": null,
+        "error": "Failed to fetch Greenhouse board huggingface: HTTPError: HTTP Error 404: Not Found",
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": {
+          "eligible": null,
+          "needs_review": null,
+          "ineligible": null
+        }
+      },
+      {
+        "requested_source": "greenhouse:customerio",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 25,
+        "passed": 0,
+        "rejected": 25,
+        "yield_rate": 0.0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        }
+      },
+      {
+        "requested_source": "greenhouse:grafanalabs",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 131,
+        "passed": 0,
+        "rejected": 131,
+        "yield_rate": 0.0,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 0,
+          "ineligible": 0
+        }
+      },
+      {
+        "requested_source": "greenhouse:canonical",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 314,
+        "passed": 6,
+        "rejected": 308,
+        "yield_rate": 0.01910828025477707,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 4,
+          "ineligible": 2
+        }
+      },
+      {
+        "requested_source": "greenhouse:testlio",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 16,
+        "passed": 1,
+        "rejected": 15,
+        "yield_rate": 0.0625,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 1,
+          "ineligible": 0
+        }
+      },
+      {
+        "requested_source": "lever:weloglobal",
+        "status": null,
+        "tool_error": {
+          "code": "operation_timeout",
+          "message": "Source trial exceeded its 30-second deadline; canonical data is unchanged."
+        },
+        "error": null,
+        "fetched": null,
+        "passed": null,
+        "rejected": null,
+        "yield_rate": null,
+        "eligibility_counts": null
+      },
+      {
+        "requested_source": "lever:rws",
+        "status": "success",
+        "tool_error": null,
+        "error": null,
+        "fetched": 156,
+        "passed": 12,
+        "rejected": 144,
+        "yield_rate": 0.07692307692307693,
+        "eligibility_counts": {
+          "eligible": 0,
+          "needs_review": 2,
+          "ineligible": 10
+        }
+      }
+    ],
+    "enabled_source_refresh": {
+      "sources_checked": 10,
+      "successful_sources": 9,
+      "failed_sources": 1,
+      "fetched": 2594,
+      "passed": 10,
+      "inserted": 10,
+      "updated": 0,
+      "yield_rate": 0.0038550501156515036
+    },
+    "refresh_eligibility_counts": {
+      "eligible": 0,
+      "needs_review": 7,
+      "ineligible": 3
+    },
+    "canonical_and_rws_proposed_only": true
+  },
+  "measured_nonzero_candidate_proposals": [
+    "greenhouse:canonical",
+    "lever:rws"
+  ]
+}

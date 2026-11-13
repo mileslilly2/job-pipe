@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
-from .db import get_analysis, get_job
+from .catalog import load_search_profile
+from .db import get_job
+from .facts import build_fact_report
+from .job_requirements import build_fit_summary, build_resume_tailoring
 from .score import RESUME_KEYWORDS, score_job_fit_v1
-from .utils import ensure_dir, load_json, normalize_text, root_dir, slugify
+from .utils import ensure_dir, normalize_text, root_dir, slugify
 
 
 PACKAGE_FOCUS_TERMS = [
@@ -59,6 +64,8 @@ class BaseProfile:
     skills: list[str]
     projects: list[ProfileProject]
     education: list[str]
+    employment: list[dict[str, Any]] = field(default_factory=list)
+    verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -80,7 +87,15 @@ def applications_dir() -> Path:
 
 
 def package_directory_for_job(job: dict[str, Any]) -> Path:
-    return applications_dir() / f"{slugify(job.get('company') or 'unknown-company')}-{slugify(job.get('title') or 'unknown-title')}"
+    company = slugify(job.get("company") or "unknown-company")
+    title = slugify(job.get("title") or "unknown-title")
+    job_id = job.get("id")
+    if job_id is not None and str(job_id).strip():
+        suffix = f"-job-{job_id}"
+    else:
+        external_id = slugify(job.get("external_id") or "")
+        suffix = f"-{external_id}" if external_id else ""
+    return applications_dir() / f"{company}-{title}{suffix}"
 
 
 def application_package_paths(job: dict[str, Any]) -> ApplicationPackagePaths:
@@ -96,32 +111,88 @@ def application_package_paths(job: dict[str, Any]) -> ApplicationPackagePaths:
 
 
 def load_base_profile(path: Path | None = None) -> BaseProfile:
+    from .applicant_profile import candidate_projection, state
+    if path is None and state()["active"]:
+        candidate = candidate_projection()
+        return BaseProfile(summary=candidate.profile.get("summary", ""), skills=[s for values in candidate.skills.values() for s in values],
+                           projects=[ProfileProject(p.name, p.bullets) for p in candidate.projects],
+                           education=[" | ".join(filter(None, [e.school, e.degree, e.dates])) for e in candidate.education],
+                           employment=[e.model_dump() for e in candidate.experience], verified=True)
     actual = path or profile_path()
     text = actual.read_text(encoding="utf-8")
     return _parse_base_profile(text)
 
 
-def build_application_package(job_id: int, profile_file: Path | None = None) -> ApplicationPackagePaths:
+def existing_package(job: dict[str, Any]) -> ApplicationPackagePaths | None:
+    """Return a complete, regular bundle; refuse ambiguous or unsafe destinations."""
+    paths = application_package_paths(job)
+    root = applications_dir()
+    if root.is_symlink() or paths.directory.is_symlink():
+        raise ValueError("Application package destination must not be a symlink.")
+    if paths.directory.resolve().parent != root.resolve():
+        raise ValueError("Application package destination escapes applications directory.")
+    artifacts = (paths.job_md, paths.fit_md, paths.resume_tailored_md, paths.cover_note_md, paths.apply_md)
+    if any(path.is_symlink() for path in artifacts):
+        raise ValueError("Application package artifacts must not be symlinks.")
+    if not paths.directory.exists():
+        return None
+    if not paths.directory.is_dir() or not all(path.is_file() for path in artifacts):
+        raise ValueError("Incomplete application package; inspect and move it aside before preparing again. Existing files were preserved.")
+    return paths
+
+
+def build_application_package(job_id: int, profile_file: Path | None = None, *, preparation_mode: str | None = None) -> ApplicationPackagePaths:
     job_row = get_job(job_id)
     if not job_row:
         raise ValueError(f"Job {job_id} not found.")
     if str(job_row["status"] or "") not in PACKAGE_READY_STATUSES:
         raise ValueError("Run save before package.")
 
-    analysis_row = get_analysis(job_id)
     job = dict(job_row)
+    existing = existing_package(job)
+    if existing is not None:
+        return existing
+    if preparation_mode is None:
+        from .applicant_profile import state
+        from .services import get_job_eligibility
+        preparation_mode = "draft_preparation" if state()["active"] and get_job_eligibility(job_id)["eligibility"]["status"] != "eligible" else "ready_for_submission"
     base_profile = load_base_profile(profile_file)
-    fit_score, matched_keywords, missing_keywords, concerns = _fit_context(job, analysis_row)
+    fit_score, fact_report = _fit_context(job)
+    fit_summary = build_fit_summary(job, base_profile)
+    tailoring = build_resume_tailoring(job, base_profile)
 
-    directory = package_directory_for_job(job)
-    ensure_dir(directory)
     paths = application_package_paths(job)
-
-    paths.job_md.write_text(_build_job_md(job), encoding="utf-8")
-    paths.fit_md.write_text(_build_fit_md(fit_score, matched_keywords, missing_keywords, concerns), encoding="utf-8")
-    paths.resume_tailored_md.write_text(_build_resume_tailored_md(job, base_profile), encoding="utf-8")
-    paths.cover_note_md.write_text(_build_cover_note_md(job, fit_score, matched_keywords), encoding="utf-8")
-    paths.apply_md.write_text(_build_apply_md(job, job_id), encoding="utf-8")
+    content = {
+        paths.job_md.name: _build_job_md(job),
+        paths.fit_md.name: _build_fit_md(fit_score, fit_summary),
+        paths.resume_tailored_md.name: _build_resume_tailored_md(tailoring),
+        paths.cover_note_md.name: _build_cover_note_md(job, fit_score, fact_report, tailoring),
+        paths.apply_md.name: _build_apply_md(job, job_id),
+    }
+    if base_profile.verified:
+        employment_lines = []
+        for record in base_profile.employment:
+            employment_lines.extend([f"### {record['title']} — {record['organization']}", record["dates"], *[f"- {b}" for b in record["bullets"]], ""])
+        if employment_lines:
+            content[paths.resume_tailored_md.name] += "\n## Professional Employment\n\n" + "\n".join(employment_lines)
+    if preparation_mode == "draft_preparation":
+        from .services import get_job_eligibility
+        assessment = get_job_eligibility(job_id)["eligibility"]
+        banner = "> DRAFT — BLOCKED FROM SUBMISSION READINESS. Eligibility is not established.\n\n"
+        content = {name: banner + value for name, value in content.items()}
+        content[paths.apply_md.name] += "\n## Unresolved Information\n\n" + "\n".join(f"- {gap}" for gap in [*assessment["missing_applicant_information"], *assessment["missing_employer_information"], *assessment["concerns"]]) + "\n"
+    ensure_dir(applications_dir())
+    staging = Path(tempfile.mkdtemp(prefix=".jobpipe-package-", dir=applications_dir()))
+    try:
+        for name, text in content.items():
+            (staging / name).write_text(text, encoding="utf-8")
+        # A competing writer must never cause replacement of user materials.
+        if paths.directory.exists() or paths.directory.is_symlink():
+            raise ValueError("Application package appeared during preparation; retry after inspection.")
+        staging.rename(paths.directory)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
     return paths
 
 
@@ -168,42 +239,12 @@ def _parse_base_profile(text: str) -> BaseProfile:
     return BaseProfile(summary=summary, skills=skills, projects=projects, education=education)
 
 
-def _fit_context(job: dict[str, Any], analysis_row) -> tuple[int, list[str], list[str], list[str]]:
-    text = " ".join(
-        str(value or "")
-        for value in (
-            job.get("title"),
-            job.get("company"),
-            job.get("location"),
-            job.get("description"),
-            job.get("raw_text"),
-        )
-    ).lower()
-    computed_score, notes = score_job_fit_v1(job)
-    fit_score = computed_score
-    matched_keywords = [keyword for keyword in RESUME_KEYWORDS if _phrase_in_text(text, keyword)]
-    missing_keywords = [keyword for keyword in RESUME_KEYWORDS if keyword not in matched_keywords]
-    concerns: list[str] = []
-
-    if analysis_row is not None:
-        red_flags = load_json(analysis_row["red_flags_json"])
-        if isinstance(red_flags, list):
-            concerns.extend(str(flag) for flag in red_flags)
-        skip_reason = analysis_row["skip_reason"]
-        if skip_reason:
-            concerns.append(str(skip_reason))
-        analysis_notes = analysis_row["notes"] or ""
-        if analysis_notes:
-            concerns.extend(note.strip() for note in analysis_notes.split("; ") if note.strip())
-    else:
-        concerns.extend(
-            note
-            for note in notes
-            if note.startswith("-") or "ignored" in note or (note.startswith("role family:") and "(-" in note)
-        )
-
-    concerns = _dedupe_preserve_order(concerns)
-    return fit_score, matched_keywords, missing_keywords, concerns
+def _fit_context(job: dict[str, Any]) -> tuple[int, Any]:
+    from .services import job_score
+    profile = load_search_profile()
+    computed_score, _notes = job_score(job, profile=profile)
+    fact_report = build_fact_report(job, profile)
+    return computed_score, fact_report
 
 
 def _build_job_md(job: dict[str, Any]) -> str:
@@ -223,71 +264,66 @@ def _build_job_md(job: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_fit_md(fit_score: int, matched_keywords: list[str], missing_keywords: list[str], concerns: list[str]) -> str:
+def _build_fit_md(fit_score: int, fit_summary) -> str:
     lines = [
         "# Fit",
         "",
         f"- Fit score: {fit_score}/100",
         "",
-        "## Matched keywords",
+        "## Matched Requirements",
         "",
     ]
-    lines.extend(f"- {keyword}" for keyword in (matched_keywords or ["None"]))
-    lines.extend(["", "## Missing keywords", ""])
-    lines.extend(f"- {keyword}" for keyword in (missing_keywords or ["None"]))
-    lines.extend(["", "## Concerns / penalties", ""])
-    lines.extend(f"- {concern}" for concern in (concerns or ["None recorded."]))
+    lines.extend(f"- {item}" for item in (fit_summary.matched_requirements or ["None"]))
+    lines.extend(["", "## Missing Requirements", ""])
+    lines.extend(f"- {item}" for item in (fit_summary.missing_requirements or ["None"]))
+    lines.extend(["", "## Concerns", ""])
+    lines.extend(f"- {item}" for item in (fit_summary.concerns or ["None recorded."]))
+    lines.extend(["", "## Suggested Emphasis", ""])
+    lines.extend(f"- {item}" for item in (fit_summary.suggested_emphasis or ["None recorded."]))
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_resume_tailored_md(job: dict[str, Any], base_profile: BaseProfile) -> str:
-    job_text = " ".join(
-        str(value or "")
-        for value in (
-            job.get("title"),
-            job.get("company"),
-            job.get("location"),
-            job.get("description"),
-            job.get("raw_text"),
-        )
-    ).lower()
-    focus_terms = _select_focus_terms(job_text)
-    summary = base_profile.summary
-    if focus_terms:
-        summary = f"{summary} For this role, I would foreground { _join_phrases(focus_terms[:3]) }."
-
-    skills = _select_skills(base_profile.skills, job_text)
-    projects = _select_projects(base_profile.projects, job_text)
-
+def _build_resume_tailored_md(tailoring) -> str:
     lines = [
         "# Tailored Resume",
         "",
         "## Summary",
         "",
-        summary or "Project-focused technical problem solver.",
+        tailoring.summary or "[Summary requires applicant confirmation.]",
         "",
         "## Relevant Skills",
         "",
     ]
-    lines.extend(f"- {skill}" for skill in skills)
+    lines.extend(f"- {skill}" for skill in (tailoring.selected_skills or ["None"]))
     lines.extend(["", "## Selected Projects", ""])
-    for project in projects:
-        lines.extend([f"### {project.title}", ""])
-        lines.extend(f"- {bullet}" for bullet in project.bullets)
+    for project in tailoring.selected_projects:
+        lines.extend([f"### {project['title']}", ""])
+        lines.extend(f"- {bullet}" for bullet in (project.get("bullets") or []))
         lines.append("")
-    lines.extend(["## Education", ""])
-    lines.extend(f"- {line}" for line in (base_profile.education or ["No education section in base profile."]))
+    lines.extend(["## Suggested Emphasis", ""])
+    lines.extend(f"- {item}" for item in (tailoring.emphasis or ["None recorded."]))
+    lines.extend(["", "## Education", ""])
+    lines.extend(f"- {line}" for line in (tailoring.education or ["No education section in base profile."]))
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _build_cover_note_md(job: dict[str, Any], fit_score: int, matched_keywords: list[str]) -> str:
+def _build_cover_note_md(job: dict[str, Any], fit_score: int, fact_report, tailoring) -> str:
     company = job.get("company") or "your team"
     title = job.get("title") or "role"
-    focus = ", ".join(matched_keywords[:3]) if matched_keywords else "practical problem solving"
+    from .applicant_profile import state
+    if state()["active"]:
+        lines = [f"I am interested in the {title} role at {company}."]
+        if tailoring.selected_skills:
+            lines.append("My confirmed skills include " + ", ".join(tailoring.selected_skills[:4]) + ".")
+        for project in tailoring.selected_projects[:1]:
+            lines.append(f"My independent project work includes {project['title']}.")
+        return "\n\n".join(lines) + "\n"
+    focus = ", ".join(tailoring.selected_skills[:4]) if tailoring.selected_skills else "practical problem solving"
+    project_focus = tailoring.selected_projects[0]["title"] if tailoring.selected_projects else "repeatable workflows"
     lines = [
         f"I am writing to apply for the {title} role at {company}. The posting looks like a good fit for my background in {focus}.",
         "",
-        "I have built local automation pipelines, debugging scripts, and repeatable workflows with Python, SQLite, CLI tooling, and tests, and I am comfortable turning vague problems into clear steps.",
+        f"I have built local automation pipelines, debugging scripts, and repeatable workflows around {project_focus}, and I am comfortable turning vague problems into clear steps.",
         "",
         f"This package reflects a measured fit score of {fit_score}/100, and I would be glad to discuss how I could contribute in a practical, reliable way.",
     ]

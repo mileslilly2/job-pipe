@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from jobpipe.catalog import load_search_profile
 from jobpipe.classify import classify_job, detect_seniority
 from jobpipe.models import CandidateProfile, DiscoveredJob, RolePack
 from jobpipe.parse import parse_job_text
@@ -132,3 +133,35 @@ def test_fit_scoring_v1_penalizes_seniority() -> None:
 
     assert senior_score < junior_score
     assert any("manager" in note for note in notes)
+
+
+def test_fit_scoring_v1_penalizes_experience_mismatch() -> None:
+    profile = load_search_profile()
+    junior = DiscoveredJob(
+        provider="greenhouse",
+        external_id="score-4",
+        company="Acme",
+        title="Junior Data Engineer",
+        location="Remote",
+        remote=True,
+        apply_url="https://example.com/score-4",
+        description="Python SQL ETL with 2+ years of experience",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+    senior = DiscoveredJob(
+        provider="greenhouse",
+        external_id="score-5",
+        company="Acme",
+        title="Senior Data Engineer",
+        location="Remote",
+        remote=True,
+        apply_url="https://example.com/score-5",
+        description="Python SQL ETL with 8+ years of experience",
+        posted_at="2026-06-22T00:00:00+00:00",
+    )
+
+    junior_score, junior_notes = score_job_fit_v1(junior, profile=profile)
+    senior_score, senior_notes = score_job_fit_v1(senior, profile=profile)
+
+    assert senior_score < junior_score
+    assert any("experience mismatch" in note for note in senior_notes)

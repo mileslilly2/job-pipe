@@ -33,7 +33,7 @@ def test_batch_review_processes_save_package_apply_and_skip_paths(initialized_wo
     opened_urls: list[str] = []
     monkeypatch.setattr("jobpipe.cli.open_url", lambda url: opened_urls.append(url) or True)
 
-    result = runner.invoke(app, ["batch-review"], input="s\np\na\ny\nk\n")
+    result = runner.invoke(app, ["batch-review"], input="s\n\n\np\n\n\na\n\n\ny\nk\n\n\n")
     assert result.exit_code == 0, result.stdout
 
     assert opened_urls == ["https://example.com/apply"]
@@ -69,8 +69,8 @@ def test_batch_review_processes_save_package_apply_and_skip_paths(initialized_wo
     assert apply_application["followup_at"] is not None
     assert skip_application["status"] == "saved"
 
-    package_dir = Path(f"applications/{slugify('Beta Labs')}-{slugify('Automation Engineer')}")
-    apply_dir = Path(f"applications/{slugify('Gamma Systems')}-{slugify('Support Engineer')}")
+    package_dir = Path(f"applications/{slugify('Beta Labs')}-{slugify('Automation Engineer')}-job-{package_id}")
+    apply_dir = Path(f"applications/{slugify('Gamma Systems')}-{slugify('Support Engineer')}-job-{apply_id}")
     for directory in [package_dir, apply_dir]:
         assert (directory / "job.md").exists()
         assert (directory / "fit.md").exists()

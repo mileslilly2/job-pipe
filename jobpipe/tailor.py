@@ -25,6 +25,10 @@ def tailor_job(job: ParsedJob, role_type: str, pack: RolePack | None, candidate:
         f"I am interested in this {job.title or role_type} role because it aligns with my background in "
         f"{angle}, clear communication, and structured problem solving."
     )
+    from .applicant_profile import state
+    if state()["active"]:
+        cover_note = f"I am interested in the {job.title or role_type} role."
+        answers = {"why_interested": "[Applicant response required]", "weakness_bridge": "[Applicant response required]", "resume_angle": angle}
     return TailorResult(
         resume_summary=summary,
         selected_skills=skills,
@@ -88,6 +92,9 @@ def _select_bullets(text: str, angle: str, candidate: CandidateProfile) -> list[
 
 
 def _rewrite_bullet(bullet: str, angle: str) -> str:
+    from .applicant_profile import state
+    if state()["active"]:
+        return bullet
     if angle == "documentation" and "document" not in bullet.lower():
         return f"{bullet.rstrip('.')} while documenting repeatable steps for future troubleshooting."
     if angle == "customer communication" and "communication" not in bullet.lower():

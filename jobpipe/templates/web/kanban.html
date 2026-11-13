@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card stack">
+  <div class="actions">
+    <a class="button" href="/jobs">Jobs</a>
+    <a class="button" href="/views">Saved views</a>
+  </div>
+  <h2>Kanban</h2>
+  <div class="muted">Cards are grouped by current status or derived package state. Status moves stay server-rendered.</div>
+</section>
+
+<section class="kanban-board">
+  {% for column in columns %}
+  <div class="card kanban-column">
+    <div class="kanban-column-head">
+      <div>
+        <h3>{{ column.label }}</h3>
+        <div class="muted">{{ column.description }}</div>
+      </div>
+      <span class="pill">{{ column.jobs|length }}</span>
+    </div>
+    <div class="kanban-column-list">
+      {% if column.jobs %}
+        {% for job in column.jobs %}
+        <article class="card kanban-card stack">
+          <div class="kanban-card-top">
+            <div class="kanban-score">{{ job.score }}</div>
+            <div>
+              <div><strong>{{ job.company }}</strong></div>
+              <div>{{ job.title }}</div>
+              <div class="muted">{{ job.location or "Unknown location" }}</div>
+              <div class="meta-row">
+                <span class="pill">{{ job.provider }}</span>
+                <span class="pill">{{ job.bucket }}</span>
+                {% if job.has_package %}<span class="pill good">packaged</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="button small" href="/jobs/{{ job.id }}">Details</a>
+            <form method="post" action="/jobs/{{ job.id }}/save?next={{ '/kanban' | urlencode }}">
+              <button class="small secondary" type="submit">Save</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/skip?next={{ '/kanban' | urlencode }}">
+              <button class="small danger" type="submit">Skip</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/package?next={{ '/kanban' | urlencode }}">
+              <button class="small secondary" type="submit">Package</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/status/applied?next={{ '/kanban' | urlencode }}">
+              <button class="small primary" type="submit">Mark applied</button>
+            </form>
+            {% if job.apply_url or job.source_url %}
+            <form method="post" action="/jobs/{{ job.id }}/apply-flow?next={{ '/kanban' | urlencode }}">
+              <button class="small primary" type="submit">Open apply URL</button>
+            </form>
+            {% endif %}
+          </div>
+          <div class="status-moves">
+            <form method="post" action="/jobs/{{ job.id }}/status/ready_to_apply?next={{ '/kanban' | urlencode }}">
+              <button class="small secondary" type="submit">Assessment</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/status/interview?next={{ '/kanban' | urlencode }}">
+              <button class="small secondary" type="submit">Interview</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/status/offer?next={{ '/kanban' | urlencode }}">
+              <button class="small secondary" type="submit">Offer</button>
+            </form>
+            <form method="post" action="/jobs/{{ job.id }}/status/rejected?next={{ '/kanban' | urlencode }}">
+              <button class="small danger" type="submit">Rejected</button>
+            </form>
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+        <div class="muted">No jobs in this column.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}
